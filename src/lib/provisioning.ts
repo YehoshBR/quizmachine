@@ -73,8 +73,12 @@ async function createHostingerDnsRecord(domain: string): Promise<{ attempted: bo
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
+      // overwrite:true pro name+type específico — idempotente (se o registro
+      // já existir, ex: de uma tentativa anterior que não confirmou a tempo,
+      // substitui em vez de dar conflito). Só afeta esse name+type, não a
+      // zona inteira.
       body: JSON.stringify({
-        overwrite: false,
+        overwrite: true,
         zone: [{ name, type: "A", ttl: 300, records: [{ content: VPS_IP }] }],
       }),
     });
