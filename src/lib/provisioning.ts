@@ -15,12 +15,20 @@
 // ausente ou API recusa), cai pro fluxo manual (instrui o usuário a criar o
 // registro A ele mesmo).
 // ============================================================
-import { promises as dns } from "node:dns";
+import { Resolver } from "node:dns";
 import { promises as fs } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
+
+// Consulta 8.8.8.8/1.1.1.1 direto em vez do resolvedor padrão do sistema
+// (systemd-resolved na VPS) — esse guarda em cache resposta negativa
+// (NXDOMAIN) de antes do registro existir, e não expira a tempo do usuário
+// tentar de novo. Resolvedor público não tem esse cache local.
+const externalResolver = new Resolver();
+externalResolver.setServers(["8.8.8.8", "1.1.1.1"]);
+const resolve4External = promisify(externalResolver.resolve4.bind(externalResolver));
 
 const DOMAIN_RE = /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/i;
 const VPS_IP = "85.31.60.46";
@@ -51,7 +59,7 @@ function splitDomain(domain: string): { name: string; rootDomain: string } {
 
 async function checkDnsPointsToVps(domain: string): Promise<{ pointing: boolean; found: string[] }> {
   try {
-    const addrs = await dns.resolve4(domain);
+    const addrs = await resolve4External(domain);
     return { pointing: addrs.includes(VPS_IP), found: addrs };
   } catch {
     return { pointing: false, found: [] };
