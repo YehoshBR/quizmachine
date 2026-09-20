@@ -71,7 +71,14 @@ export async function createQuiz(input: {
   const { rows } = await db.query<QuizRow>(
     `insert into quizzes (slug, name, tier, quiz_meta, screens, scoring_map)
      values ($1, $2, $3, $4, $5, $6) returning *`,
-    [input.slug, input.name, input.tier, input.quizMeta, input.screens, input.scoringMap]
+    [
+      input.slug,
+      input.name,
+      input.tier,
+      JSON.stringify(input.quizMeta),
+      JSON.stringify(input.screens),
+      JSON.stringify(input.scoringMap),
+    ]
   );
   return rows[0];
 }
@@ -98,9 +105,9 @@ export async function updateQuiz(
     domain: patch.domain,
     tier: patch.tier,
     status: patch.status,
-    quiz_meta: patch.quizMeta,
-    screens: patch.screens,
-    scoring_map: patch.scoringMap,
+    quiz_meta: patch.quizMeta !== undefined ? JSON.stringify(patch.quizMeta) : undefined,
+    screens: patch.screens !== undefined ? JSON.stringify(patch.screens) : undefined,
+    scoring_map: patch.scoringMap !== undefined ? JSON.stringify(patch.scoringMap) : undefined,
   };
   for (const [col, val] of Object.entries(map)) {
     if (val === undefined) continue;
@@ -135,7 +142,14 @@ export async function insertLead(input: {
   if (!db) return; // sem DB configurado: não quebra o funil, só não salva
   await db.query(
     `insert into leads (quiz_id, name, email, whatsapp, answers, utm) values ($1,$2,$3,$4,$5,$6)`,
-    [input.quizId, input.name ?? null, input.email ?? null, input.whatsapp ?? null, input.answers, input.utm ?? {}]
+    [
+      input.quizId,
+      input.name ?? null,
+      input.email ?? null,
+      input.whatsapp ?? null,
+      JSON.stringify(input.answers),
+      JSON.stringify(input.utm ?? {}),
+    ]
   );
 }
 
