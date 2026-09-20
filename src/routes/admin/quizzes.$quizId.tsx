@@ -276,16 +276,24 @@ function EditQuizPage() {
   }
 
   /**
-   * Converte o texto que a skill quiz-funnel-builder gera (blocos
-   * "TELA N — FASE | TIPO: ..." com headline/pergunta/opções em texto livre)
-   * pro formato de tela [Screen] deste motor. É um melhor-esforço: telas
-   * simples (single, intro, conteúdo, prova social, loading, depoimentos,
-   * lead) saem prontas; telas de seleção múltipla (o motor não usa múltipla
-   * escolha) e blocos de gráfico/diagnóstico ficam marcados com ⚠️ pra
-   * revisão manual no campo abaixo antes de salvar.
+   * Converte texto gerado pela skill quiz-funnel-builder pro formato de tela
+   * [Screen] deste motor. Aceita dois estilos:
+   * 1) Markdown normal — o formato real que costuma sair — com
+   *    "## FASE N: NOME (telas X a Y)" + "### Tela N | Tipo: ..." +
+   *    "Função:"/"Personalização:" opcionais + parágrafos + lista "- opção".
+   * 2) O template literal do SKILL.md: blocos "━━━" com cabeçalho
+   *    "TELA N — FASE | TIPO: ..." numa linha só e opções "□ opção".
+   * É um melhor-esforço: telas simples (pergunta única, intro, conteúdo,
+   * prova social, loading, depoimentos, lead) saem prontas; seleção múltipla,
+   * diagnóstico que ramifica por resposta anterior, e gráficos sem números
+   * claros ficam marcados com ⚠️ pra revisão manual antes de salvar.
    */
   function parseMarkdownScreens(raw: string): { screens: Record<string, unknown>[]; reviewCount: number } {
     type ParsedBlock = { n: number; fase: string; tipoRaw: string; bodyLines: string[]; options: { label: string; value: string }[] };
+
+    function stripAccentsLower(s: string): string {
+      return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    }
 
     function extractOptions(lines: string[]): { options: { label: string; value: string }[]; rest: string[] } {
       const optRe = /^\s*(?:[□☐▢▪✓✔•\-*]|\d+[.)])\s+(.*)$/;
@@ -312,34 +320,95 @@ function EditQuizPage() {
         .filter(Boolean);
     }
 
-    function classifyScreenType(tipoRaw: string, bodyText: string, hasOptions: boolean) {
-      const t = tipoRaw.toLowerCase();
-      const b = bodyText.toLowerCase();
+    /** Prefere o parágrafo que termina em "?" — evita pegar uma nota entre
+     * colchetes (ex: "[usar foto real...]") que sobrou depois da pergunta. */
+    function pickQuestion(paragraphs: string[]): string {
+      return paragraphs.find((p) => /\?\s*$/.test(p.trim())) ?? paragraphs[paragraphs.length - 1] ?? "";
+    }
+
+    function shortTitle(paragraphs: string[], fallback: string): string {
+      const first = paragraphs[0]?.split("\n")[0]?.trim();
+      if (!first) return fallback;
+      return first.length <= 70 ? first : `${first.slice(0, 67)}...`;
+    }
+
+    const LIKERT_HINTS = ["concordo totalmente", "concordo parcialmente", "neutro", "discordo parcialmente", "discordo totalmente"];
+    function looksLikeScale(options: { label: string }[]): boolean {
+      if (options.length < 3) return false;
+      const norm = options.map((o) => stripAccentsLower(o.label));
+      return LIKERT_HINTS.filter((hint) => norm.some((n) => n.includes(hint))).length >= 3;
+    }
+
+    function classifyScreenType(tipoRaw: string, bodyText: string, hasOptions: boolean, options: { label: string }[]) {
+      const t = stripAccentsLower(tipoRaw);
+      const b = stripAccentsLower(bodyText);
       if (t.includes("intro")) return "intro";
-      if (t.includes("múltipla") || t.includes("multipla") || t.includes("multi-select")) return "multi-review";
-      if (t.includes("escala") || t.includes("concordância") || t.includes("concordancia")) return "scale";
-      if (t.includes("loading")) return "loading";
-      if (t.includes("diagnóstico") || t.includes("diagnostico") || b.includes("nível baixo") || b.includes("nivel baixo")) return "diagnosis";
-      if (t.includes("mirror") || (b.includes("esforço") && b.includes("resultado"))) return "mirror-chart";
-      if (t.includes("comparat") || (t.includes("antes") && t.includes("depois"))) return "compare";
-      if (t.includes("depoimentos") && !t.includes("prova social")) return "testimonials";
-      if (t.includes("prova social") || t.includes("whatsapp") || t.includes("social-proof") || t.includes("social proof")) return "social-proof";
+      if (t.includes("multipla") || t.includes("multi-select") || t.includes("multi select")) return "multi-review";
+      if (hasOptions && looksLikeScale(options)) return "scale";
+      if (t.includes("escala") || t.includes("concordancia")) return "scale";
+      const brancheMatches = bodyText.match(/se\s+a\s+tela\s+\d+\s*=/gi);
+      if (brancheMatches && brancheMatches.length >= 2) return "branching-review";
+      if (t.includes("carregamento") || t.includes("loading")) return "loading";
+      if ((t.includes("diagnostico") || b.includes("nivel baixo")) && /cren[çc]a\s+central\s*[:\-]/i.test(bodyText)) return "diagnosis";
       if (t.includes("gate") || t.includes("captura") || t.includes("lead")) return "lead";
-      if (t.includes("única") || t.includes("unica") || t.includes("single")) return "single";
-      if (t.includes("conteúdo") || t.includes("conteudo") || t.includes("enquadramento") || t.includes("revelação") || t.includes("revelacao") || t.includes("quebra")) return "content";
+      if (t.includes("depoimentos") && !t.includes("prova social")) return "testimonials";
+      if (t.includes("prova social") || t.includes("whatsapp") || t.includes("social-proof") || t.includes("social proof") || b.includes("inserir depoimento")) return "social-proof";
+      if (t.includes("comparat") && /\d{1,3}\s*%[\s\S]*?\d{1,3}\s*%/.test(bodyText)) return "compare";
+      if ((t.includes("mirror") || (b.includes("esforco") && b.includes("resultado"))) && /\d{1,3}\s*%[\s\S]*?\d{1,3}\s*%/.test(bodyText)) return "mirror-chart";
+      if (t.includes("pergunta") || t.includes("unica") || t.includes("única") || t.includes("single")) return hasOptions ? "single" : "content";
+      if (t.includes("conteudo") || t.includes("enquadramento") || t.includes("revelacao") || t.includes("quebra")) return "content";
       return hasOptions ? "single" : "content";
     }
 
-    function splitBlocks(text: string): ParsedBlock[] {
+    /** Extrai "## FASE N: NOME (telas X a Y)" pra saber a fase de cada tela pelo número. */
+    function extractFaseRanges(text: string): { start: number; end: number; name: string }[] {
+      const ranges: { start: number; end: number; name: string }[] = [];
+      const re = /^#{1,3}\s*FASE\s*\d+\s*[:\-]\s*([^\n(]+?)\s*(?:\(\s*telas?\s+(\d+)(?:\s*a\s*(\d+))?\s*\))?\s*$/gim;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(text))) {
+        if (!m[2]) continue;
+        const start = Number(m[2]);
+        const end = m[3] ? Number(m[3]) : start;
+        ranges.push({ start, end, name: m[1].trim() });
+      }
+      return ranges;
+    }
+    function faseForN(ranges: { start: number; end: number; name: string }[], n: number): string {
+      return ranges.find((r) => n >= r.start && n <= r.end)?.name ?? "";
+    }
+
+    /** Formato realista: "## FASE..." + "### Tela N | Tipo: ...". */
+    function splitBlocksHeadingStyle(text: string): ParsedBlock[] {
+      const faseRanges = extractFaseRanges(text);
+      const parts = text.split(/(?=^#{1,4}\s)/m);
+      const blocks: ParsedBlock[] = [];
+      for (const part of parts) {
+        const lines = part.split("\n");
+        const header = lines[0] ?? "";
+        const hm = header.match(/^#{1,4}\s*Tela\s*\[?\s*(\d+)\s*\]?\s*\|\s*Tipo\s*:\s*(.+)/i);
+        if (!hm) continue; // ignora H1/H2 de título, fase ou seções depois do quiz
+        const n = Number(hm[1]);
+        const tipoRaw = hm[2].trim();
+        const rest = lines
+          .slice(1)
+          .filter((l) => !/^Fun[çc][ãa]o\s*:/i.test(l.trim()))
+          .filter((l) => !/^Personaliza[çc][ãa]o\s*:/i.test(l.trim()))
+          .filter((l) => !/^\[\s*continuar\s*\]$/i.test(l.trim()))
+          .filter((l) => !/^\[\s*tela\s+de\s+carregamento\s*\]$/i.test(l.trim()))
+          .filter((l) => !/^-{3,}\s*$/.test(l.trim()));
+        const { options, rest: bodyLines } = extractOptions(rest);
+        blocks.push({ n, fase: faseForN(faseRanges, n), tipoRaw, bodyLines, options });
+      }
+      return blocks;
+    }
+
+    /** Formato literal do SKILL.md: separadores "━━━" e "TELA N — FASE | TIPO: ..." numa linha. */
+    function splitBlocksLegacyStyle(text: string): ParsedBlock[] {
       const noSep = text
-        .replace(/\r\n/g, "\n")
         .split("\n")
         .filter((l) => !/^[━=\-_*~]{5,}\s*$/.test(l.trim()))
         .join("\n");
-      const parts = noSep
-        .split(/(?=^\s*TELA\s*\[?\s*\d+)/im)
-        .map((p) => p.trim())
-        .filter(Boolean);
+      const parts = noSep.split(/(?=^\s*TELA\s*\[?\s*\d+)/im).map((p) => p.trim()).filter(Boolean);
       return parts.map((part, i) => {
         const lines = part.split("\n");
         const header = lines[0] ?? "";
@@ -355,17 +424,19 @@ function EditQuizPage() {
       });
     }
 
-    function buildScreen(block: ParsedBlock): Record<string, unknown> {
+    function buildScreen(block: ParsedBlock, isFirst: boolean): Record<string, unknown> {
       const id = `t${block.n}_${slugify(block.fase) || "tela"}`;
-      const bodyLines = block.bodyLines.filter((l) => !/^\[\s*continuar\s*\]$/i.test(l.trim()));
+      const bodyLines = block.bodyLines;
       const paragraphs = buildParagraphs(bodyLines);
       const fullText = bodyLines.join("\n");
       const hasOptions = block.options.length > 0;
-      const kind = classifyScreenType(block.tipoRaw, fullText, hasOptions);
-      const question = paragraphs[paragraphs.length - 1] ?? "";
-      const heading = paragraphs[0] ?? "";
-      const sub = paragraphs.length > 2 ? paragraphs[1] : undefined;
       const options = block.options.map((o) => ({ value: o.value, label: o.label }));
+      // Por convenção deste motor (CLAUDE.md), a 1ª tela do quiz é sempre
+      // "intro" — mesmo que o texto original chame ela de "pergunta".
+      const kind = isFirst && hasOptions ? "intro" : classifyScreenType(block.tipoRaw, fullText, hasOptions, options);
+      const heading = paragraphs[0] ?? "";
+      const question = pickQuestion(paragraphs);
+      const sub = paragraphs.length > 2 && paragraphs[1] !== question ? paragraphs[1] : undefined;
 
       switch (kind) {
         case "intro":
@@ -378,15 +449,25 @@ function EditQuizPage() {
           };
         case "single":
           return { id, type: "single", question: question || heading || `Tela ${block.n}`, options };
-        case "scale":
-          return { id, type: "scale", question: heading || question || "Avalie o quanto você concorda:", statement: paragraphs[1] ?? question };
-        case "loading":
+        case "scale": {
+          const qLine = question || heading;
+          const m = qLine.match(/^(.*?):\s*"(.+)"\s*$/);
+          return {
+            id, type: "scale",
+            question: m ? `${m[1].trim()}:` : qLine || "Avalie o quanto você concorda:",
+            statement: m ? m[2].trim() : paragraphs[1] ?? "",
+          };
+        }
+        case "loading": {
+          const quoted = fullText.match(/"([^"]{6,120})"/);
+          const extraLines = paragraphs.slice(1).filter((p) => !/^\[/.test(p));
           return {
             id, type: "loading",
-            title: heading || "Preparando seu plano personalizado...",
-            lines: paragraphs.slice(1).length ? paragraphs.slice(1) : ["Analisando suas respostas...", "Quase pronto..."],
+            title: quoted ? quoted[1].trim() : shortTitle(paragraphs, "Preparando seu plano personalizado..."),
+            lines: extraLines.length ? extraLines : ["Analisando suas respostas...", "Quase pronto..."],
             durationMs: 4000,
           };
+        }
         case "diagnosis": {
           const cardDefs = [
             { label: "Crença Central", re: /cren[çc]a\s+central\s*[:\-]\s*(.+)/i },
@@ -400,7 +481,7 @@ function EditQuizPage() {
           });
           return {
             id, type: "diagnosis",
-            title: heading || "Sua probabilidade de resultado: NÍVEL BAIXO",
+            title: shortTitle(paragraphs, "Sua probabilidade de resultado: NÍVEL BAIXO"),
             levels: ["Iniciante", "Em Formação", "Crescendo", "Pronto", "Expert"],
             levelColors: ["bg-destructive", "bg-orange-500", "bg-amber-400", "bg-lime-400", "bg-emerald-500"],
             label: "Você",
@@ -408,6 +489,18 @@ function EditQuizPage() {
             cards,
           };
         }
+        case "branching-review":
+          return {
+            id, type: "content",
+            title: `⚠️ REVISAR MANUALMENTE (diagnóstico muda por resposta anterior): ${shortTitle(paragraphs, `Tela ${block.n}`)}`,
+            body: [
+              "Esta tela muda de conteúdo dependendo de uma resposta anterior do quiz. Este",
+              "importador não monta lógica dinâmica sozinho — escolha manualmente qual texto usar",
+              "aqui (ou peça pra implementar a ramificação de verdade no motor). Texto original completo:",
+              "",
+              fullText,
+            ].join("\n"),
+          };
         case "compare": {
           const rowRe = /^[-*•]?\s*\[?([^:%\n]{2,60}?)\]?\s*[:\-]?\s*(\d{1,3})\s*%.*?(\d{1,3})\s*%/;
           const rows = bodyLines
@@ -416,7 +509,7 @@ function EditQuizPage() {
             .map((m) => ({ label: m[1].trim(), beforePct: Number(m[2]), afterPct: Number(m[3]) }));
           return {
             id, type: "compare",
-            title: heading || "Veja a diferença de quem age:",
+            title: shortTitle(paragraphs, "Veja a diferença de quem age:"),
             beforeLabel: "Antes", afterLabel: "Depois",
             rows: rows.length ? rows : [{ label: "⚠️ A revisar — preencha as métricas", beforePct: 20, afterPct: 80 }],
           };
@@ -426,7 +519,7 @@ function EditQuizPage() {
           return {
             id, type: "mirror-chart",
             ...(paragraphs.length > 2 ? { intro: heading } : {}),
-            title: paragraphs.length > 2 ? paragraphs[1] : heading || "Antes de encontrar a solução...",
+            title: paragraphs.length > 2 ? paragraphs[1] : shortTitle(paragraphs, "Antes de encontrar a solução..."),
             insight: paragraphs[paragraphs.length - 1] ?? "⚠️ A revisar",
             effortPct: pcts[0] ?? 83,
             resultPct: pcts[1] ?? 14,
@@ -440,25 +533,22 @@ function EditQuizPage() {
             .map((m) => ({ name: m[1].trim(), text: m[2].trim() }));
           return {
             id, type: "testimonials",
-            title: heading || "Veja quem já transformou:",
+            title: shortTitle(paragraphs, "Veja quem já transformou:"),
             items: items.length ? items : [{ name: "Depoimento", text: paragraphs.join(" ") || "⚠️ A revisar" }],
           };
         }
-        case "social-proof": {
-          const waMatch = fullText.match(/^([A-ZÀ-Ú][\wÀ-ú.\s]{1,30})[:\-–—]\s*"?(.+?)"?\s*$/m);
+        case "social-proof":
           return {
             id, type: "social-proof",
-            title: heading || "Veja o que estão dizendo:",
-            body: paragraphs.slice(1).join("\n\n") || paragraphs.join("\n\n") || "",
-            ...(waMatch ? { whatsapp: { author: waMatch[1].trim(), text: waMatch[2].trim(), meta: "" } } : {}),
+            title: shortTitle(paragraphs, "Veja o que estão dizendo:"),
+            body: paragraphs.join("\n\n") || "",
           };
-        }
         case "lead":
-          return { id, type: "lead", title: heading || "Última etapa antes de receber seu plano", subtitle: paragraphs[1] };
+          return { id, type: "lead", title: shortTitle(paragraphs, "Última etapa antes de receber seu plano"), subtitle: paragraphs[1] };
         case "multi-review":
           return {
             id, type: "content",
-            title: `⚠️ REVISAR MANUALMENTE (era seleção múltipla): ${heading || question || `Tela ${block.n}`}`,
+            title: `⚠️ REVISAR MANUALMENTE (era seleção múltipla): ${shortTitle(paragraphs, `Tela ${block.n}`)}`,
             body: [
               "Esta tela era de seleção múltipla no texto original. Este motor não usa múltipla escolha —",
               "divida em várias telas `single` (uma pergunta por item) antes de publicar. Opções originais:",
@@ -470,14 +560,17 @@ function EditQuizPage() {
         default:
           return {
             id, type: "content",
-            title: heading || `Tela ${block.n}`,
-            body: (heading ? paragraphs.slice(1) : paragraphs).join("\n\n") || "",
+            title: shortTitle(paragraphs, `Tela ${block.n}`),
+            body: paragraphs.join("\n\n") || "",
           };
       }
     }
 
-    const blocks = splitBlocks(raw);
-    const screens = blocks.map(buildScreen);
+    const cleaned = raw.replace(/\r\n/g, "\n");
+    const usesHeadings = /^#{1,4}\s*Tela\s+\d+/im.test(cleaned);
+    const blocks = usesHeadings ? splitBlocksHeadingStyle(cleaned) : splitBlocksLegacyStyle(cleaned);
+    const firstN = Math.min(...blocks.map((b) => b.n));
+    const screens = blocks.map((b) => buildScreen(b, b.n === firstN));
     const reviewCount = screens.filter((s) => typeof s.title === "string" && (s.title as string).startsWith("⚠️")).length;
     return { screens, reviewCount };
   }
@@ -486,10 +579,10 @@ function EditQuizPage() {
     const reader = new FileReader();
     reader.onload = () => {
       const raw = String(reader.result);
-      if (!/TELA\s*\[?\s*\d+/i.test(raw)) {
+      if (!/#{1,4}\s*Tela\s+\d+/i.test(raw) && !/TELA\s*\[?\s*\d+/i.test(raw)) {
         setToast({
           kind: "error",
-          text: `Não reconheci o formato de "${file.name}". Esperado o texto gerado pela skill de quiz, com blocos "TELA 1 — FASE | TIPO: ...".`,
+          text: `Não reconheci o formato de "${file.name}". Esperado o texto gerado pela skill de quiz, com blocos "### Tela 1 | Tipo: ..." (ou "TELA 1 — FASE | TIPO: ...").`,
         });
         return;
       }
