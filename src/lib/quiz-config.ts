@@ -22,7 +22,43 @@ export interface QuizMeta {
   primaryColor?: string;
   /** Cor secundária do tema. Sobrescreve --secondary. */
   secondaryColor?: string;
+  /**
+   * Dados do PRODUTO — sempre o mesmo produto, independente da resposta.
+   * Preenchido uma vez no painel ao montar o quiz. A /oferta usa isso pra
+   * montar o pitch; o que muda por visitante é só qual dor/desejo é destacado
+   * primeiro (ver `signalLibrary` + `Option.signals`).
+   */
+  product?: ProductInfo;
+  /**
+   * Biblioteca de dores/desejos que as opções do quiz podem sinalizar (via
+   * `Option.signals`). A /oferta soma quantas vezes cada sinal apareceu nas
+   * respostas do visitante e personaliza a headline/corpo com os sinais mais
+   * fortes. Sem isso configurado, a oferta cai pro conteúdo genérico do produto.
+   */
+  signalLibrary?: Record<string, SignalDef>;
 }
+
+export interface ProductInfo {
+  name: string;
+  /** Frase de efeito — a promessa central do produto (usada como base da headline). */
+  promise: string;
+  price: string;
+  installments?: string;
+  originalPrice?: string;
+  checkoutUrl: string;
+  /** Lista de benefícios/entregáveis — vira a lista "o que você recebe" na oferta. */
+  benefits: string[];
+  guarantee?: string;
+}
+
+export type SignalDef = {
+  label: string;
+  kind: "pain" | "desire";
+  /** Headline curta usada na oferta quando este é o sinal dominante. Use *palavra* pra destacar. */
+  headline: string;
+  /** 1-2 frases desenvolvendo o sinal, tocando na dor/desejo específico. */
+  body: string;
+};
 
 export interface LeadField {
   id: string;
@@ -37,6 +73,8 @@ type Option = {
   label: string;
   image?: string;
   emoji?: string;
+  /** Chaves de `quizMeta.signalLibrary` que essa resposta sinaliza (dor e/ou desejo). Opcional. */
+  signals?: string[];
 };
 
 type Quote = { author: string; text: string };
@@ -195,6 +233,114 @@ export const quizMeta: QuizMeta = {
   // expertImage: "/expert.jpg", // TODO: adicionar foto e reativar
   productName: "DIGITAL START",
   offerUrl: "/oferta",
+  product: {
+    name: "DIGITAL START",
+    promise: "Tirar você da invisibilidade digital e colocar no Instagram a autoridade que você já construiu na vida real",
+    price: "R$ 47,00",
+    installments: "ou 12x de R$ 4,08",
+    originalPrice: "R$ 2.335,00",
+    checkoutUrl: "https://payfast.greenn.com.br/9ccsf78",
+    benefits: [
+      "Curso completo Digital Start com Renan e Fran",
+      "Estratégias de crescimento e de formatos de conteúdo",
+      "Acesso vitalício à área de membros",
+      "Comunidade Digital Start",
+      "Uma aula por semana ao vivo com Renan e Fran",
+    ],
+    guarantee: "Garantia incondicional de 7 dias — ou seu dinheiro de volta, sem perguntas.",
+  },
+  signalLibrary: {
+    pain_camera: {
+      label: "Trava na câmera",
+      kind: "pain",
+      headline: "Você não precisa *perder a vergonha* pra começar. Precisa de uma estrutura pra gravar sem travar.",
+      body: "Você já gravou, assistiu, não gostou e apagou. O problema nunca foi a câmera — foi não ter uma linha editorial que te diga exatamente o que falar.",
+    },
+    pain_invisibilidade: {
+      label: "Invisibilidade digital",
+      kind: "pain",
+      headline: "Você tem *autoridade* na vida real. No digital, quase ninguém sabe disso.",
+      body: "Seu perfil não mostra o tamanho do que você já construiu. Pra uma boa parte do mercado, você simplesmente não existe.",
+    },
+    pain_comparacao: {
+      label: "Comparação paralisante",
+      kind: "pain",
+      headline: "Enquanto você fica *parado*, alguém com metade da sua experiência está sendo tratado como referência.",
+      body: "Ver gente menos preparada crescendo não deveria te congelar — deveria te mostrar que o jogo é sobre visibilidade, não só competência.",
+    },
+    pain_recomeco: {
+      label: "Ciclo do recomeço",
+      kind: "pain",
+      headline: "Chega de *começar* e parar. Dessa vez o plano tem ordem.",
+      body: "Você já tentou postar com constância várias vezes. O problema nunca foi disciplina — foi tentar postar sem posicionamento antes.",
+    },
+    pain_posicionamento: {
+      label: "Falta de posicionamento",
+      kind: "pain",
+      headline: "O problema nunca foi *o que postar*. Foi não ter um posicionamento antes de postar.",
+      body: "Sem saber quem você é no digital e pra quem você fala, todo conteúdo vira tentativa e erro.",
+    },
+    pain_financeiro: {
+      label: "Perda financeira",
+      kind: "pain",
+      headline: "Cada mês invisível é *dinheiro* que devia estar no seu bolso.",
+      body: "Clientes e oportunidades já passaram por você e foram pra quem apareceu mais — não pra quem sabia mais.",
+    },
+    pain_julgamento: {
+      label: "Medo de julgamento",
+      kind: "pain",
+      headline: "Ninguém vai te achar *se achando* por mostrar o que você já construiu.",
+      body: "O medo do julgamento de quem te conhece é o que mais trava profissionais bons. A Digital Start te dá o roteiro pra aparecer sem parecer forçado.",
+    },
+    pain_autossabotagem: {
+      label: "Autossabotagem",
+      kind: "pain",
+      headline: "Você não precisa *acreditar* 100% ainda. Precisa só de um plano claro pra seguir.",
+      body: "A dúvida de que 'isso não é pra mim' desaparece assim que você tem um passo a passo pronto, não teoria solta.",
+    },
+    pain_tempo_perdido: {
+      label: "Timing perdido",
+      kind: "pain",
+      headline: "O timing *não passou*. Só ainda não tinha o mapa certo.",
+      body: "A sensação de atraso é só isso: sensação. Quem começa com posicionamento certo recupera o tempo rápido.",
+    },
+    desire_autoridade: {
+      label: "Deseja autoridade",
+      kind: "desire",
+      headline: "Coloque no digital a *autoridade* que você já tem na vida real.",
+      body: "Você quer ser visto como referência na sua área — e isso se constrói com posicionamento, não com sorte.",
+    },
+    desire_clientes: {
+      label: "Deseja mais clientes",
+      kind: "desire",
+      headline: "Clientes chegando até *você*, sem precisar correr atrás.",
+      body: "Um perfil que comunica quem você é vira a sua melhor fonte de indicação — 24 horas por dia.",
+    },
+    desire_reconhecimento: {
+      label: "Deseja reconhecimento",
+      kind: "desire",
+      headline: "Seja o *primeiro nome* que vem à cabeça quando falarem da sua área.",
+      body: "Reconhecimento não vem de sorte. Vem de constância e de um posicionamento que ninguém esquece.",
+    },
+    desire_constancia: {
+      label: "Deseja constância",
+      kind: "desire",
+      headline: "Constância sem depender de *motivação* — porque o plano já diz o que fazer.",
+      body: "Você não precisa de mais disciplina. Precisa de uma linha editorial pronta que elimina a decisão de 'o que postar hoje'.",
+    },
+    desire_resultado_rapido: {
+      label: "Deseja resultado rápido",
+      kind: "desire",
+      headline: "Resultado em *semanas*, não em anos.",
+      body: "83% dos alunos publicaram o primeiro conteúdo posicionado em menos de 7 dias depois de começar a Digital Start.",
+    },
+    desire_orgulho: {
+      label: "Deseja orgulho do perfil",
+      kind: "desire",
+      headline: "Um perfil do qual você tem *orgulho* de mandar o link.",
+      body: "Quando o seu Instagram finalmente representa o tamanho do seu trabalho, tudo muda — inclusive como você se sente ao compartilhar ele.",
+    },
+  },
   leadFields: [
     {
       id: "name",
@@ -311,9 +457,9 @@ export const screens: Screen[] = [
     type: "single",
     question: "Quando alguém desconhecido entra no seu perfil hoje, o que essa pessoa entende sobre você?",
     options: [
-      { value: "quase_nada",  label: "😶 Quase nada, meu perfil não diz nada" },
-      { value: "mais_ou_menos",label: "🤷 Entende mais ou menos o que eu faço" },
-      { value: "comecei_ontem",label: "🙃 Parece que eu comecei ontem" },
+      { value: "quase_nada",  label: "😶 Quase nada, meu perfil não diz nada", signals: ["pain_invisibilidade"] },
+      { value: "mais_ou_menos",label: "🤷 Entende mais ou menos o que eu faço", signals: ["pain_invisibilidade"] },
+      { value: "comecei_ontem",label: "🙃 Parece que eu comecei ontem", signals: ["pain_invisibilidade"] },
       { value: "fica_claro",  label: "😌 Fica claro quem eu sou" },
     ],
   },
@@ -324,9 +470,9 @@ export const screens: Screen[] = [
     type: "single",
     question: "Com que frequência você sente que está atrasado no digital?",
     options: [
-      { value: "todo_dia",     label: "😰 Todos os dias" },
-      { value: "varias_semana",label: "😞 Várias vezes por semana" },
-      { value: "as_vezes",     label: "😕 De vez em quando" },
+      { value: "todo_dia",     label: "😰 Todos os dias", signals: ["pain_tempo_perdido"] },
+      { value: "varias_semana",label: "😞 Várias vezes por semana", signals: ["pain_tempo_perdido"] },
+      { value: "as_vezes",     label: "😕 De vez em quando", signals: ["pain_tempo_perdido"] },
       { value: "quase_nunca",  label: "🙂 Quase nunca" },
     ],
   },
@@ -337,9 +483,9 @@ export const screens: Screen[] = [
     type: "single",
     question: "Você já perdeu um cliente ou uma oportunidade para alguém que aparece mais que você?",
     options: [
-      { value: "sim_varias",  label: "😤 Sim, e mais de uma vez" },
-      { value: "sim_uma",     label: "😔 Sim, uma vez" },
-      { value: "acho_que_sim",label: "🤔 Acho que sim" },
+      { value: "sim_varias",  label: "😤 Sim, e mais de uma vez", signals: ["pain_financeiro"] },
+      { value: "sim_uma",     label: "😔 Sim, uma vez", signals: ["pain_financeiro"] },
+      { value: "acho_que_sim",label: "🤔 Acho que sim", signals: ["pain_financeiro"] },
       { value: "nao",         label: "🙂 Que eu saiba, não" },
     ],
   },
@@ -365,10 +511,10 @@ export const screens: Screen[] = [
     type: "single",
     question: "Quantas vezes você já decidiu que ia começar a postar de verdade e parou?",
     options: [
-      { value: "perdi_a_conta",label: "😵 Já perdi a conta" },
-      { value: "3ou4",         label: "😩 Umas 3 ou 4 vezes" },
-      { value: "1ou2",         label: "😐 Uma ou duas vezes" },
-      { value: "nunca_comecei",label: "🚀 Nunca cheguei nem a começar" },
+      { value: "perdi_a_conta",label: "😵 Já perdi a conta", signals: ["pain_recomeco"] },
+      { value: "3ou4",         label: "😩 Umas 3 ou 4 vezes", signals: ["pain_recomeco"] },
+      { value: "1ou2",         label: "😐 Uma ou duas vezes", signals: ["pain_recomeco"] },
+      { value: "nunca_comecei",label: "🚀 Nunca cheguei nem a começar", signals: ["pain_posicionamento"] },
     ],
   },
 
@@ -382,10 +528,10 @@ export const screens: Screen[] = [
     type: "single",
     question: "Se o seu Instagram mostrasse exatamente quem você é e o que você sabe, o que mudaria primeiro?",
     options: [
-      { value: "clientes",   label: "💰 Clientes chegariam até mim" },
-      { value: "referencia", label: "👑 Eu seria visto como referência" },
-      { value: "convites",   label: "🤝 Apareceriam convites e parcerias" },
-      { value: "orgulho",    label: "😌 Eu teria orgulho do meu perfil" },
+      { value: "clientes",   label: "💰 Clientes chegariam até mim", signals: ["desire_clientes"] },
+      { value: "referencia", label: "👑 Eu seria visto como referência", signals: ["desire_autoridade"] },
+      { value: "convites",   label: "🤝 Apareceriam convites e parcerias", signals: ["desire_autoridade"] },
+      { value: "orgulho",    label: "😌 Eu teria orgulho do meu perfil", signals: ["desire_orgulho"] },
     ],
   },
 
@@ -395,10 +541,10 @@ export const screens: Screen[] = [
     type: "single",
     question: "Quantos clientes ou oportunidades a mais por mês já mudariam o seu jogo?",
     options: [
-      { value: "2a5",   label: "🌱 De 2 a 5 por mês" },
-      { value: "5a10",  label: "📈 De 5 a 10 por mês" },
-      { value: "10a20", label: "🔥 De 10 a 20 por mês" },
-      { value: "20+",   label: "🚀 Mais de 20 por mês" },
+      { value: "2a5",   label: "🌱 De 2 a 5 por mês", signals: ["desire_clientes"] },
+      { value: "5a10",  label: "📈 De 5 a 10 por mês", signals: ["desire_clientes"] },
+      { value: "10a20", label: "🔥 De 10 a 20 por mês", signals: ["desire_clientes"] },
+      { value: "20+",   label: "🚀 Mais de 20 por mês", signals: ["desire_clientes"] },
     ],
   },
 
@@ -408,10 +554,10 @@ export const screens: Screen[] = [
     type: "single",
     question: "Como você quer ser lembrado quando alguém falar da sua área?",
     options: [
-      { value: "melhor",       label: "🥇 Como o melhor no que faz" },
-      { value: "explica_melhor",label: "🧠 Como quem explica melhor que todos" },
-      { value: "confiavel",    label: "🫶 Como alguém em quem se confia" },
-      { value: "primeiro_nome",label: "🌟 Como o nome que vem na cabeça primeiro" },
+      { value: "melhor",       label: "🥇 Como o melhor no que faz", signals: ["desire_autoridade"] },
+      { value: "explica_melhor",label: "🧠 Como quem explica melhor que todos", signals: ["desire_autoridade"] },
+      { value: "confiavel",    label: "🫶 Como alguém em quem se confia", signals: ["desire_reconhecimento"] },
+      { value: "primeiro_nome",label: "🌟 Como o nome que vem na cabeça primeiro", signals: ["desire_reconhecimento"] },
     ],
   },
 
@@ -421,10 +567,10 @@ export const screens: Screen[] = [
     type: "single",
     question: "Se existisse um caminho pronto pra isso, como você preferiria seguir?",
     options: [
-      { value: "passo_a_passo",label: "🪜 Um passo a passo curto e direto" },
-      { value: "o_que_postar", label: "🎯 Alguém me dizendo o que postar" },
-      { value: "gravar",       label: "🎥 Uma estrutura pra gravar sem travar" },
-      { value: "tudo_junto",   label: "📚 Tudo isso junto" },
+      { value: "passo_a_passo",label: "🪜 Um passo a passo curto e direto", signals: ["desire_resultado_rapido"] },
+      { value: "o_que_postar", label: "🎯 Alguém me dizendo o que postar", signals: ["pain_posicionamento"] },
+      { value: "gravar",       label: "🎥 Uma estrutura pra gravar sem travar", signals: ["pain_camera"] },
+      { value: "tudo_junto",   label: "📚 Tudo isso junto", signals: ["desire_resultado_rapido"] },
     ],
   },
 
@@ -447,10 +593,10 @@ export const screens: Screen[] = [
     type: "single",
     question: "Qual área da sua vida a invisibilidade digital já prejudicou mais?",
     options: [
-      { value: "faturamento",  label: "💸 Meu faturamento" },
-      { value: "reconhecimento",label: "🏅 Meu reconhecimento profissional" },
-      { value: "oportunidades",label: "🚪 As oportunidades que não chegaram" },
-      { value: "confianca",    label: "😞 Minha confiança em me expor" },
+      { value: "faturamento",  label: "💸 Meu faturamento", signals: ["pain_financeiro"] },
+      { value: "reconhecimento",label: "🏅 Meu reconhecimento profissional", signals: ["pain_invisibilidade"] },
+      { value: "oportunidades",label: "🚪 As oportunidades que não chegaram", signals: ["pain_financeiro"] },
+      { value: "confianca",    label: "😞 Minha confiança em me expor", signals: ["pain_camera"] },
     ],
   },
 
@@ -460,8 +606,8 @@ export const screens: Screen[] = [
     type: "single",
     question: "O quanto isso já atrapalhou o seu crescimento até hoje?",
     options: [
-      { value: "muito",    label: "🔴 Atrapalhou muito, me travou anos" },
-      { value: "bastante", label: "🟠 Atrapalhou bastante" },
+      { value: "muito",    label: "🔴 Atrapalhou muito, me travou anos", signals: ["pain_invisibilidade"] },
+      { value: "bastante", label: "🟠 Atrapalhou bastante", signals: ["pain_invisibilidade"] },
       { value: "um_pouco", label: "🟡 Atrapalhou um pouco" },
       { value: "quase_nada",label: "🟢 Quase não atrapalhou" },
     ],
@@ -473,10 +619,10 @@ export const screens: Screen[] = [
     type: "single",
     question: "O que você sente quando vê alguém com menos experiência que você bombando na internet?",
     options: [
-      { value: "raiva_de_mim",label: "😖 Uma raiva de mim mesmo" },
-      { value: "perdi_timing",label: "😔 Que eu perdi o timing" },
-      { value: "nao_sirvo",   label: "😐 Sinto que eu não sirvo pra isso" },
-      { value: "vontade_reagir",label: "🔥 Sinto vontade de reagir" },
+      { value: "raiva_de_mim",label: "😖 Uma raiva de mim mesmo", signals: ["pain_comparacao"] },
+      { value: "perdi_timing",label: "😔 Que eu perdi o timing", signals: ["pain_tempo_perdido"] },
+      { value: "nao_sirvo",   label: "😐 Sinto que eu não sirvo pra isso", signals: ["pain_autossabotagem"] },
+      { value: "vontade_reagir",label: "🔥 Sinto vontade de reagir", signals: ["desire_autoridade"] },
     ],
   },
 
@@ -490,9 +636,9 @@ export const screens: Screen[] = [
     type: "single",
     question: "Quando o assunto é se posicionar na internet, você se considera:",
     options: [
-      { value: "perdido",     label: "😵 Totalmente perdido, não faço ideia" },
-      { value: "basico",      label: "😕 Sei o básico, mas não sei aplicar" },
-      { value: "nao_executo", label: "🙂 Entendo, mas não consigo executar" },
+      { value: "perdido",     label: "😵 Totalmente perdido, não faço ideia", signals: ["pain_posicionamento"] },
+      { value: "basico",      label: "😕 Sei o básico, mas não sei aplicar", signals: ["pain_posicionamento"] },
+      { value: "nao_executo", label: "🙂 Entendo, mas não consigo executar", signals: ["pain_posicionamento"] },
       { value: "ja_sei",      label: "😎 Já sei bastante coisa" },
     ],
   },
@@ -503,10 +649,10 @@ export const screens: Screen[] = [
     type: "single",
     question: "O que a falta de presença digital mais rouba de você hoje?",
     options: [
-      { value: "dinheiro", label: "💰 Dinheiro que eu deveria estar ganhando" },
-      { value: "tempo",    label: "⏳ Tempo, porque eu já devia ter começado" },
-      { value: "lugar",    label: "🙇 A sensação de estar no meu lugar" },
-      { value: "tamanho",  label: "🎯 O tamanho que o meu trabalho merece" },
+      { value: "dinheiro", label: "💰 Dinheiro que eu deveria estar ganhando", signals: ["pain_financeiro"] },
+      { value: "tempo",    label: "⏳ Tempo, porque eu já devia ter começado", signals: ["pain_tempo_perdido"] },
+      { value: "lugar",    label: "🙇 A sensação de estar no meu lugar", signals: ["pain_invisibilidade"] },
+      { value: "tamanho",  label: "🎯 O tamanho que o meu trabalho merece", signals: ["desire_reconhecimento"] },
     ],
   },
 
@@ -548,8 +694,8 @@ export const screens: Screen[] = [
     type: "single",
     question: "Seja sincero: você sabe muito mais do que aquilo que você publica?",
     options: [
-      { value: "absurdamente_mais",label: "😅 Sei absurdamente mais do que publico" },
-      { value: "bastante_mais",    label: "🤐 Sei bastante mais" },
+      { value: "absurdamente_mais",label: "😅 Sei absurdamente mais do que publico", signals: ["pain_invisibilidade"] },
+      { value: "bastante_mais",    label: "🤐 Sei bastante mais", signals: ["pain_invisibilidade"] },
       { value: "mais_ou_menos",    label: "😐 Mais ou menos igual" },
       { value: "nunca_pensei",     label: "🤔 Nunca tinha pensado nisso" },
     ],
@@ -561,10 +707,10 @@ export const screens: Screen[] = [
     type: "single",
     question: "Qual dessas frases mais passa na sua cabeça na hora de postar?",
     options: [
-      { value: "me_achando",  label: "🙈 \"Vão achar que eu tô me achando\"" },
-      { value: "falar_besteira",label: "😬 \"E se eu falar besteira?\"" },
-      { value: "ninguem_quer",label: "🥱 \"Ninguém quer ver isso\"" },
-      { value: "nao_quero_influencer",label: "🚫 \"Eu não quero virar influencer\"" },
+      { value: "me_achando",  label: "🙈 \"Vão achar que eu tô me achando\"", signals: ["pain_julgamento"] },
+      { value: "falar_besteira",label: "😬 \"E se eu falar besteira?\"", signals: ["pain_camera"] },
+      { value: "ninguem_quer",label: "🥱 \"Ninguém quer ver isso\"", signals: ["pain_invisibilidade"] },
+      { value: "nao_quero_influencer",label: "🚫 \"Eu não quero virar influencer\"", signals: ["pain_julgamento"] },
     ],
   },
 
@@ -582,9 +728,9 @@ export const screens: Screen[] = [
     type: "single",
     question: "Você já gravou um vídeo, assistiu, não gostou e apagou antes de postar?",
     options: [
-      { value: "sim_varias",  label: "😩 Sim, várias vezes" },
-      { value: "sim_ja",      label: "😕 Sim, já aconteceu" },
-      { value: "nem_gravei",  label: "🎬 Nem cheguei a gravar ainda" },
+      { value: "sim_varias",  label: "😩 Sim, várias vezes", signals: ["pain_camera"] },
+      { value: "sim_ja",      label: "😕 Sim, já aconteceu", signals: ["pain_camera"] },
+      { value: "nem_gravei",  label: "🎬 Nem cheguei a gravar ainda", signals: ["pain_camera"] },
       { value: "posto_mesmo", label: "🙂 Não, eu posto mesmo assim" },
     ],
   },
@@ -599,10 +745,10 @@ export const screens: Screen[] = [
     type: "single",
     question: "Quem você mais teme que julgue os seus posts?",
     options: [
-      { value: "familia",  label: "👨‍👩‍👧 Minha família" },
-      { value: "amigos",   label: "🧑‍🤝‍🧑 Meus amigos próximos" },
-      { value: "colegas",  label: "🏢 Colegas e concorrentes da área" },
-      { value: "todo_mundo",label: "😶 Todo mundo, sinceramente" },
+      { value: "familia",  label: "👨‍👩‍👧 Minha família", signals: ["pain_julgamento"] },
+      { value: "amigos",   label: "🧑‍🤝‍🧑 Meus amigos próximos", signals: ["pain_julgamento"] },
+      { value: "colegas",  label: "🏢 Colegas e concorrentes da área", signals: ["pain_julgamento"] },
+      { value: "todo_mundo",label: "😶 Todo mundo, sinceramente", signals: ["pain_julgamento"] },
     ],
   },
 
@@ -612,8 +758,8 @@ export const screens: Screen[] = [
     type: "single",
     question: "Você acha que se autossabota quando o assunto é aparecer?",
     options: [
-      { value: "claramente",  label: "😣 Sim, claramente" },
-      { value: "um_pouco",    label: "😕 Acho que um pouco" },
+      { value: "claramente",  label: "😣 Sim, claramente", signals: ["pain_autossabotagem"] },
+      { value: "um_pouco",    label: "😕 Acho que um pouco", signals: ["pain_autossabotagem"] },
       { value: "nunca_pensei",label: "🤔 Nunca parei pra pensar" },
       { value: "outro",       label: "🙅 Não, o problema é outro" },
     ],
@@ -625,9 +771,9 @@ export const screens: Screen[] = [
     type: "single",
     question: "Você acredita que VOCÊ consegue construir uma presença digital forte?",
     options: [
-      { value: "com_certeza",  label: "🔥 Sim, com certeza" },
-      { value: "tenho_duvidas",label: "🙂 Talvez, mas tenho dúvidas" },
-      { value: "nao_e_pra_mim",label: "😔 Não acredito que isso é pra mim" },
+      { value: "com_certeza",  label: "🔥 Sim, com certeza", signals: ["desire_resultado_rapido"] },
+      { value: "tenho_duvidas",label: "🙂 Talvez, mas tenho dúvidas", signals: ["pain_autossabotagem"] },
+      { value: "nao_e_pra_mim",label: "😔 Não acredito que isso é pra mim", signals: ["pain_autossabotagem"] },
     ],
   },
 
@@ -637,10 +783,10 @@ export const screens: Screen[] = [
     type: "single",
     question: "O que costuma acontecer quando você começa a postar com constância?",
     options: [
-      { value: "some_vontade",label: "🔄 Engreno, aí some a vontade e eu paro" },
-      { value: "sem_resultado",label: "📉 Não vem resultado e eu desanimo" },
-      { value: "correria",    label: "⏰ A correria do trabalho me engole" },
-      { value: "sem_ideias",  label: "💡 Acabam as ideias do que postar" },
+      { value: "some_vontade",label: "🔄 Engreno, aí some a vontade e eu paro", signals: ["pain_recomeco"] },
+      { value: "sem_resultado",label: "📉 Não vem resultado e eu desanimo", signals: ["pain_recomeco"] },
+      { value: "correria",    label: "⏰ A correria do trabalho me engole", signals: ["desire_constancia"] },
+      { value: "sem_ideias",  label: "💡 Acabam as ideias do que postar", signals: ["pain_posicionamento"] },
     ],
   },
 
@@ -654,10 +800,10 @@ export const screens: Screen[] = [
     type: "single",
     question: "Se você tivesse um passo a passo pronto de posicionamento, conteúdo e câmera, em quanto tempo o seu perfil estaria representando quem você é?",
     options: [
-      { value: "30dias",  label: "🔥 Em menos de 30 dias" },
-      { value: "3meses",  label: "📈 Em uns 3 meses" },
+      { value: "30dias",  label: "🔥 Em menos de 30 dias", signals: ["desire_resultado_rapido"] },
+      { value: "3meses",  label: "📈 Em uns 3 meses", signals: ["desire_resultado_rapido"] },
       { value: "6meses",  label: "🕐 Em uns 6 meses" },
-      { value: "1ano",    label: "🙁 Mais de um ano" },
+      { value: "1ano",    label: "🙁 Mais de um ano", signals: ["pain_tempo_perdido"] },
     ],
   },
 
@@ -667,10 +813,10 @@ export const screens: Screen[] = [
     type: "single",
     question: "Qual é o seu MAIOR impedimento hoje?",
     options: [
-      { value: "posicionamento",label: "🧭 Não sei como me posicionar" },
-      { value: "camera",        label: "🎥 Eu travo na hora de gravar" },
-      { value: "o_que_postar",  label: "📝 Não sei o que postar" },
-      { value: "ninguem_ve",    label: "📉 Eu posto e ninguém vê" },
+      { value: "posicionamento",label: "🧭 Não sei como me posicionar", signals: ["pain_posicionamento"] },
+      { value: "camera",        label: "🎥 Eu travo na hora de gravar", signals: ["pain_camera"] },
+      { value: "o_que_postar",  label: "📝 Não sei o que postar", signals: ["pain_posicionamento"] },
+      { value: "ninguem_ve",    label: "📉 Eu posto e ninguém vê", signals: ["pain_invisibilidade"] },
     ],
   },
 
@@ -727,9 +873,9 @@ export const screens: Screen[] = [
     question: "Agora que você viu o que está te travando, quão motivado você está pra resolver isso?",
     options: [
       { value: "curioso",       label: "🤔 Só estou curioso" },
-      { value: "nao_sei_consigo",label: "😔 Ainda não sei se eu consigo" },
-      { value: "disposto",      label: "💪 Estou disposto a tentar" },
-      { value: "nao_vou_parar", label: "🔥 Não vou parar até conseguir" },
+      { value: "nao_sei_consigo",label: "😔 Ainda não sei se eu consigo", signals: ["pain_autossabotagem"] },
+      { value: "disposto",      label: "💪 Estou disposto a tentar", signals: ["desire_resultado_rapido"] },
+      { value: "nao_vou_parar", label: "🔥 Não vou parar até conseguir", signals: ["desire_resultado_rapido"] },
     ],
   },
 
@@ -820,9 +966,9 @@ export const screens: Screen[] = [
     type: "single",
     question: "Você acredita que conseguiria colocar sua autoridade no digital se tivesse esse plano na mão?",
     options: [
-      { value: "pronto",     label: "✅ Sim, estou pronto pra isso" },
-      { value: "so_direcao", label: "🙂 Com certeza, só preciso de direção" },
-      { value: "quero_tentar",label: "🙁 Acho que sim, quero tentar" },
+      { value: "pronto",     label: "✅ Sim, estou pronto pra isso", signals: ["desire_resultado_rapido"] },
+      { value: "so_direcao", label: "🙂 Com certeza, só preciso de direção", signals: ["pain_posicionamento"] },
+      { value: "quero_tentar",label: "🙁 Acho que sim, quero tentar", signals: ["pain_autossabotagem"] },
     ],
   },
 

@@ -33,7 +33,26 @@ function EditQuizPage() {
   const [domain, setDomain] = useState(quiz.domain ?? "");
   const [tier, setTier] = useState(quiz.tier);
   const [status, setStatus] = useState(quiz.status);
-  const [quizMetaText, setQuizMetaText] = useState(() => JSON.stringify(quiz.quiz_meta, null, 2));
+
+  // Produto — sempre o mesmo produto por quiz, separado do resto do quizMeta
+  // porque é a informação que mais muda de importância (é o que a oferta
+  // personalizada usa pra montar o pitch). Ver src/routes/oferta.tsx.
+  const initialProduct = quiz.quiz_meta.product;
+  const [productName, setProductName] = useState(initialProduct?.name ?? "");
+  const [productPromise, setProductPromise] = useState(initialProduct?.promise ?? "");
+  const [productPrice, setProductPrice] = useState(initialProduct?.price ?? "");
+  const [productOriginalPrice, setProductOriginalPrice] = useState(initialProduct?.originalPrice ?? "");
+  const [productInstallments, setProductInstallments] = useState(initialProduct?.installments ?? "");
+  const [productCheckoutUrl, setProductCheckoutUrl] = useState(initialProduct?.checkoutUrl ?? "");
+  const [productBenefitsText, setProductBenefitsText] = useState(
+    (initialProduct?.benefits ?? []).join("\n")
+  );
+  const [productGuarantee, setProductGuarantee] = useState(initialProduct?.guarantee ?? "");
+
+  const [quizMetaText, setQuizMetaText] = useState(() => {
+    const { product: _omit, ...rest } = quiz.quiz_meta as unknown as Record<string, unknown>;
+    return JSON.stringify(rest, null, 2);
+  });
   const [screensText, setScreensText] = useState(() => JSON.stringify(quiz.screens, null, 2));
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -44,7 +63,7 @@ function EditQuizPage() {
 
   async function handleSave() {
     setJsonError(null);
-    let quizMetaParsed: unknown;
+    let quizMetaParsed: Record<string, unknown>;
     let screensParsed: unknown;
     try {
       quizMetaParsed = JSON.parse(quizMetaText);
@@ -58,6 +77,22 @@ function EditQuizPage() {
       setJsonError("screens não é um JSON válido.");
       return;
     }
+
+    // Reincorpora o produto (campos estruturados) dentro do quizMeta antes de salvar.
+    const benefits = productBenefitsText.split("\n").map((b) => b.trim()).filter(Boolean);
+    if (productName || productPrice || productCheckoutUrl) {
+      quizMetaParsed.product = {
+        name: productName,
+        promise: productPromise,
+        price: productPrice,
+        ...(productOriginalPrice ? { originalPrice: productOriginalPrice } : {}),
+        ...(productInstallments ? { installments: productInstallments } : {}),
+        checkoutUrl: productCheckoutUrl,
+        benefits,
+        ...(productGuarantee ? { guarantee: productGuarantee } : {}),
+      };
+    }
+
     setSaving(true);
     try {
       const res = await fetch(`/api/admin/quiz?id=${quizId}`, {
@@ -218,16 +253,72 @@ function EditQuizPage() {
           )}
         </section>
 
+        {/* ---------- Produto (sempre o mesmo, usado na /oferta personalizada) ---------- */}
+        <section className="rounded-2xl border border-border bg-card p-6">
+          <h2 className="text-base font-bold text-foreground">Produto</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            O produto é sempre o mesmo, independente da resposta — só a ênfase da oferta muda
+            conforme a dor/desejo dominante do visitante (configurado em "Telas", campo{" "}
+            <code className="rounded bg-muted px-1">signals</code> de cada opção). Preencha aqui uma
+            vez; a página <code className="rounded bg-muted px-1">/oferta</code> usa isso pra montar
+            o pitch sozinha, sem precisar editar JSX.
+          </p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label>Nome do produto</Label>
+              <Input value={productName} onChange={(e) => setProductName(e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label>Link de checkout</Label>
+              <Input value={productCheckoutUrl} onChange={(e) => setProductCheckoutUrl(e.target.value)} placeholder="https://..." className="mt-1" />
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Promessa central (usada quando não há dor/desejo detectado)</Label>
+              <Input value={productPromise} onChange={(e) => setProductPromise(e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label>Preço</Label>
+              <Input value={productPrice} onChange={(e) => setProductPrice(e.target.value)} placeholder="R$ 47,00" className="mt-1" />
+            </div>
+            <div>
+              <Label>Preço original (ancoragem, opcional)</Label>
+              <Input value={productOriginalPrice} onChange={(e) => setProductOriginalPrice(e.target.value)} placeholder="R$ 997,00" className="mt-1" />
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Parcelamento (opcional)</Label>
+              <Input value={productInstallments} onChange={(e) => setProductInstallments(e.target.value)} placeholder="ou 12x de R$ 4,08" className="mt-1" />
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Benefícios / o que o cliente recebe (um por linha)</Label>
+              <textarea
+                value={productBenefitsText}
+                onChange={(e) => setProductBenefitsText(e.target.value)}
+                rows={5}
+                className="mt-1 w-full rounded-lg border border-input bg-background p-3 text-sm"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Garantia (opcional)</Label>
+              <Input value={productGuarantee} onChange={(e) => setProductGuarantee(e.target.value)} placeholder="Garantia incondicional de 7 dias" className="mt-1" />
+            </div>
+          </div>
+        </section>
+
         {/* ---------- quizMeta ---------- */}
         <section className="rounded-2xl border border-border bg-card p-6">
-          <h2 className="text-base font-bold text-foreground">Meta do quiz (título, logo, cores, formulário de lead...)</h2>
+          <h2 className="text-base font-bold text-foreground">Meta do quiz (título, logo, cores, formulário de lead, biblioteca de sinais...)</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Campos úteis: <code className="rounded bg-muted px-1">title</code>,{" "}
             <code className="rounded bg-muted px-1">logo</code>,{" "}
             <code className="rounded bg-muted px-1">primaryColor</code> /{" "}
             <code className="rounded bg-muted px-1">secondaryColor</code> (qualquer cor CSS: #hex, oklch(...)),{" "}
             <code className="rounded bg-muted px-1">expertName</code>,{" "}
-            <code className="rounded bg-muted px-1">offerUrl</code>.
+            <code className="rounded bg-muted px-1">offerUrl</code>. O campo{" "}
+            <code className="rounded bg-muted px-1">signalLibrary</code> é a biblioteca de dores/desejos
+            que a oferta personalizada usa — cada chave precisa de <code className="rounded bg-muted px-1">label</code>,{" "}
+            <code className="rounded bg-muted px-1">kind</code> (<code className="rounded bg-muted px-1">"pain"</code> ou{" "}
+            <code className="rounded bg-muted px-1">"desire"</code>), <code className="rounded bg-muted px-1">headline</code> e{" "}
+            <code className="rounded bg-muted px-1">body</code>. O produto ficou na seção acima.
           </p>
           <textarea
             value={quizMetaText}
@@ -243,7 +334,10 @@ function EditQuizPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             Array de telas, na ordem em que aparecem. Cole as URLs de imagem da seção acima nos campos{" "}
             <code className="rounded bg-muted px-1">image</code>. Vídeo é sempre pelo ID do YouTube em{" "}
-            <code className="rounded bg-muted px-1">video.youtubeId</code>.
+            <code className="rounded bg-muted px-1">video.youtubeId</code>. Pra oferta personalizada:
+            marque em <code className="rounded bg-muted px-1">signals</code> de cada opção quais chaves
+            do <code className="rounded bg-muted px-1">signalLibrary</code> ela sinaliza — ex:{" "}
+            <code className="rounded bg-muted px-1">"signals": ["pain_camera"]</code>.
           </p>
           <textarea
             value={screensText}

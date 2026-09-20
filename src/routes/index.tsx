@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { QuizMeta, Screen } from "@/lib/quiz-config";
 import { getTenantQuiz } from "@/lib/tenant";
+import { persistAnswers } from "@/lib/signals";
 import { ThemedLoader } from "@/components/ThemedLoader";
 import { YoutubeFacade } from "@/components/YoutubeFacade";
 
@@ -84,6 +85,7 @@ function QuizPage() {
       if (pct >= 100) {
         clearInterval(i);
         setTimeout(() => {
+          persistAnswers(answers);
           navigate({ to: resolveOfferPath(quizMeta, answers) as "/" });
         }, 300);
       }
@@ -489,6 +491,7 @@ function QuizPage() {
               } catch (err) {
                 console.error("Falha ao enviar lead (seguindo o funil mesmo assim):", err);
               }
+              persistAnswers({ ...answers, ...leadValues });
               setSubmitting(false);
               setAnalyzing(true);
             }}
