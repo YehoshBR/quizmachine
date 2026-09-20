@@ -22,6 +22,8 @@ export interface QuizMeta {
   primaryColor?: string;
   /** Cor secundária do tema. Sobrescreve --secondary. */
   secondaryColor?: string;
+  /** "dark" troca fundo/cards pra uma paleta escura (preto/carvão) antes de aplicar as cores acima. Padrão: "light". */
+  backgroundMode?: "light" | "dark";
   /**
    * Dados do PRODUTO — sempre o mesmo produto, independente da resposta.
    * Preenchido uma vez no painel ao montar o quiz. A /oferta usa isso pra
@@ -233,6 +235,11 @@ export const quizMeta: QuizMeta = {
   // expertImage: "/expert.jpg", // TODO: adicionar foto e reativar
   productName: "DIGITAL START",
   offerUrl: "/oferta",
+  // Preto + neon azul/roxo — pra bater com o logo (badge preto, wordmark em
+  // gradiente azul/roxo). O tema claro (SoulBicho) brigava com esse logo.
+  backgroundMode: "dark",
+  primaryColor: "#5B8DEF",
+  secondaryColor: "#8B5CF6",
   product: {
     name: "DIGITAL START",
     promise: "Tirar você da invisibilidade digital e colocar no Instagram a autoridade que você já construiu na vida real",

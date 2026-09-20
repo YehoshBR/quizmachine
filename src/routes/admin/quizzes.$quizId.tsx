@@ -49,8 +49,18 @@ function EditQuizPage() {
   );
   const [productGuarantee, setProductGuarantee] = useState(initialProduct?.guarantee ?? "");
 
+  // Aparência — separado do JSON também, porque é a queixa nº1 de "ficou
+  // genérico": sem isso só dava pra trocar a cor de destaque via JSON cru,
+  // nunca o modo claro/escuro. Ver src/routes/__root.tsx (buildThemeCss).
+  const [backgroundMode, setBackgroundMode] = useState<"light" | "dark">(
+    quiz.quiz_meta.backgroundMode ?? "light"
+  );
+  const [primaryColor, setPrimaryColor] = useState(quiz.quiz_meta.primaryColor ?? "");
+  const [secondaryColor, setSecondaryColor] = useState(quiz.quiz_meta.secondaryColor ?? "");
+
   const [quizMetaText, setQuizMetaText] = useState(() => {
-    const { product: _omit, ...rest } = quiz.quiz_meta as unknown as Record<string, unknown>;
+    const { product: _p, backgroundMode: _bg, primaryColor: _pc, secondaryColor: _sc, ...rest } =
+      quiz.quiz_meta as unknown as Record<string, unknown>;
     return JSON.stringify(rest, null, 2);
   });
   const [screensText, setScreensText] = useState(() => JSON.stringify(quiz.screens, null, 2));
@@ -92,6 +102,13 @@ function EditQuizPage() {
         ...(productGuarantee ? { guarantee: productGuarantee } : {}),
       };
     }
+
+    // Reincorpora a aparência.
+    quizMetaParsed.backgroundMode = backgroundMode;
+    if (primaryColor) quizMetaParsed.primaryColor = primaryColor;
+    else delete quizMetaParsed.primaryColor;
+    if (secondaryColor) quizMetaParsed.secondaryColor = secondaryColor;
+    else delete quizMetaParsed.secondaryColor;
 
     setSaving(true);
     try {
@@ -214,6 +231,53 @@ function EditQuizPage() {
                 <option value="draft">Rascunho (não aparece no domínio)</option>
                 <option value="published">Publicado</option>
               </select>
+            </div>
+          </div>
+        </section>
+
+        {/* ---------- Aparência ---------- */}
+        <section className="rounded-2xl border border-border bg-card p-6">
+          <h2 className="text-base font-bold text-foreground">Aparência</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            "Escuro" troca fundo/cards pra uma base preta/carvão antes de aplicar as cores abaixo —
+            use pra quiz com logo em fundo preto/neon (fica mais parecido com o padrão QBC/Governo
+            Mental). As cores aceitam qualquer valor CSS (o seletor abaixo salva em hex).
+          </p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            <div>
+              <Label>Modo de fundo</Label>
+              <select
+                value={backgroundMode}
+                onChange={(e) => setBackgroundMode(e.target.value as "light" | "dark")}
+                className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="light">Claro</option>
+                <option value="dark">Escuro</option>
+              </select>
+            </div>
+            <div>
+              <Label>Cor primária</Label>
+              <div className="mt-1 flex items-center gap-2">
+                <input
+                  type="color"
+                  value={/^#[0-9a-fA-F]{6}$/.test(primaryColor) ? primaryColor : "#5B8DEF"}
+                  onChange={(e) => setPrimaryColor(e.target.value)}
+                  className="h-10 w-12 shrink-0 rounded border border-input bg-background"
+                />
+                <Input value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} placeholder="#5B8DEF ou oklch(...)" />
+              </div>
+            </div>
+            <div>
+              <Label>Cor secundária</Label>
+              <div className="mt-1 flex items-center gap-2">
+                <input
+                  type="color"
+                  value={/^#[0-9a-fA-F]{6}$/.test(secondaryColor) ? secondaryColor : "#8B5CF6"}
+                  onChange={(e) => setSecondaryColor(e.target.value)}
+                  className="h-10 w-12 shrink-0 rounded border border-input bg-background"
+                />
+                <Input value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} placeholder="#8B5CF6 ou oklch(...)" />
+              </div>
             </div>
           </div>
         </section>

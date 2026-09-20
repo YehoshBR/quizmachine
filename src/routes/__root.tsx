@@ -9,6 +9,41 @@ import {
 } from "@tanstack/react-router";
 import appCss from "../styles.css?url";
 import { getTenantQuiz } from "@/lib/tenant";
+import type { QuizMeta } from "@/lib/quiz-config";
+
+/**
+ * Monta o override de tema por tenant. "dark" troca a base inteira (fundo,
+ * card, texto, borda) pra uma paleta escura ANTES de aplicar primary/secondary
+ * — assim um quiz com logo em fundo preto/neon (ex: Digital Start) não briga
+ * com um fundo claro genérico. Sem backgroundMode, só primary/secondary mudam.
+ */
+function buildThemeCss(quizMeta: QuizMeta | undefined): string {
+  if (!quizMeta) return "";
+  const tokens: string[] = [];
+
+  if (quizMeta.backgroundMode === "dark") {
+    tokens.push(
+      "--background:oklch(0.09 0 0)",
+      "--foreground:oklch(0.98 0 0)",
+      "--card:oklch(0.15 0.003 264)",
+      "--card-foreground:oklch(0.98 0 0)",
+      "--muted:oklch(0.19 0.003 264)",
+      "--muted-foreground:oklch(0.68 0.005 264)",
+      "--accent:oklch(0.22 0.01 264)",
+      "--accent-foreground:oklch(0.98 0 0)",
+      "--border:oklch(0.27 0.01 264)",
+      "--input:oklch(0.19 0.003 264)"
+    );
+  }
+  if (quizMeta.primaryColor) {
+    tokens.push(`--primary:${quizMeta.primaryColor}`, `--ring:${quizMeta.primaryColor}`);
+  }
+  if (quizMeta.secondaryColor) {
+    tokens.push(`--secondary:${quizMeta.secondaryColor}`);
+  }
+
+  return tokens.length ? `:root{${tokens.join(";")}}` : "";
+}
 
 function NotFoundComponent() {
   return (
@@ -55,14 +90,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   loader: () => getTenantQuiz(),
   head: ({ loaderData }) => {
     const quizMeta = loaderData?.quizMeta;
-    // Sobrescreve --primary/--secondary por tenant, direto no <head>, pra não
-    // ter flash da cor errada no primeiro paint (SSR já sai com a cor certa).
-    const themeCss =
-      quizMeta?.primaryColor || quizMeta?.secondaryColor
-        ? `:root{${quizMeta.primaryColor ? `--primary:${quizMeta.primaryColor};--ring:${quizMeta.primaryColor};` : ""}${
-            quizMeta.secondaryColor ? `--secondary:${quizMeta.secondaryColor};` : ""
-          }}`
-        : "";
+    // Sobrescreve o tema por tenant, direto no <head>, pra não ter flash da
+    // cor/fundo errado no primeiro paint (SSR já sai com o tema certo).
+    const themeCss = buildThemeCss(quizMeta);
     return {
       meta: [
         { charSet: "utf-8" },
