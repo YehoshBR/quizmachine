@@ -11,6 +11,14 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as OfertaRouteImport } from './routes/oferta'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as ApiLeadsRouteImport } from './routes/api/leads'
+import { Route as AdminLoginRouteImport } from './routes/admin/login'
+import { Route as ApiAdminUploadRouteImport } from './routes/api/admin/upload'
+import { Route as ApiAdminSeedRouteImport } from './routes/api/admin/seed'
+import { Route as ApiAdminQuizzesRouteImport } from './routes/api/admin/quizzes'
+import { Route as ApiAdminQuizRouteImport } from './routes/api/admin/quiz'
+import { Route as AdminQuizzesQuizIdRouteImport } from './routes/admin/quizzes.$quizId'
 
 const OfertaRoute = OfertaRouteImport.update({
   id: '/oferta',
@@ -22,31 +30,134 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLeadsRoute = ApiLeadsRouteImport.update({
+  id: '/api/leads',
+  path: '/api/leads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/admin/login',
+  path: '/admin/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminUploadRoute = ApiAdminUploadRouteImport.update({
+  id: '/api/admin/upload',
+  path: '/api/admin/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminSeedRoute = ApiAdminSeedRouteImport.update({
+  id: '/api/admin/seed',
+  path: '/api/admin/seed',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminQuizzesRoute = ApiAdminQuizzesRouteImport.update({
+  id: '/api/admin/quizzes',
+  path: '/api/admin/quizzes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminQuizRoute = ApiAdminQuizRouteImport.update({
+  id: '/api/admin/quiz',
+  path: '/api/admin/quiz',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminQuizzesQuizIdRoute = AdminQuizzesQuizIdRouteImport.update({
+  id: '/admin/quizzes/$quizId',
+  path: '/admin/quizzes/$quizId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/oferta': typeof OfertaRoute
+  '/admin/login': typeof AdminLoginRoute
+  '/api/leads': typeof ApiLeadsRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/quizzes/$quizId': typeof AdminQuizzesQuizIdRoute
+  '/api/admin/quiz': typeof ApiAdminQuizRoute
+  '/api/admin/quizzes': typeof ApiAdminQuizzesRoute
+  '/api/admin/seed': typeof ApiAdminSeedRoute
+  '/api/admin/upload': typeof ApiAdminUploadRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/oferta': typeof OfertaRoute
+  '/admin/login': typeof AdminLoginRoute
+  '/api/leads': typeof ApiLeadsRoute
+  '/admin': typeof AdminIndexRoute
+  '/admin/quizzes/$quizId': typeof AdminQuizzesQuizIdRoute
+  '/api/admin/quiz': typeof ApiAdminQuizRoute
+  '/api/admin/quizzes': typeof ApiAdminQuizzesRoute
+  '/api/admin/seed': typeof ApiAdminSeedRoute
+  '/api/admin/upload': typeof ApiAdminUploadRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/oferta': typeof OfertaRoute
+  '/admin/login': typeof AdminLoginRoute
+  '/api/leads': typeof ApiLeadsRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/quizzes/$quizId': typeof AdminQuizzesQuizIdRoute
+  '/api/admin/quiz': typeof ApiAdminQuizRoute
+  '/api/admin/quizzes': typeof ApiAdminQuizzesRoute
+  '/api/admin/seed': typeof ApiAdminSeedRoute
+  '/api/admin/upload': typeof ApiAdminUploadRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/oferta'
+  fullPaths:
+    | '/'
+    | '/oferta'
+    | '/admin/login'
+    | '/api/leads'
+    | '/admin/'
+    | '/admin/quizzes/$quizId'
+    | '/api/admin/quiz'
+    | '/api/admin/quizzes'
+    | '/api/admin/seed'
+    | '/api/admin/upload'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/oferta'
-  id: '__root__' | '/' | '/oferta'
+  to:
+    | '/'
+    | '/oferta'
+    | '/admin/login'
+    | '/api/leads'
+    | '/admin'
+    | '/admin/quizzes/$quizId'
+    | '/api/admin/quiz'
+    | '/api/admin/quizzes'
+    | '/api/admin/seed'
+    | '/api/admin/upload'
+  id:
+    | '__root__'
+    | '/'
+    | '/oferta'
+    | '/admin/login'
+    | '/api/leads'
+    | '/admin/'
+    | '/admin/quizzes/$quizId'
+    | '/api/admin/quiz'
+    | '/api/admin/quizzes'
+    | '/api/admin/seed'
+    | '/api/admin/upload'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   OfertaRoute: typeof OfertaRoute
+  AdminLoginRoute: typeof AdminLoginRoute
+  ApiLeadsRoute: typeof ApiLeadsRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+  AdminQuizzesQuizIdRoute: typeof AdminQuizzesQuizIdRoute
+  ApiAdminQuizRoute: typeof ApiAdminQuizRoute
+  ApiAdminQuizzesRoute: typeof ApiAdminQuizzesRoute
+  ApiAdminSeedRoute: typeof ApiAdminSeedRoute
+  ApiAdminUploadRoute: typeof ApiAdminUploadRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +176,76 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/leads': {
+      id: '/api/leads'
+      path: '/api/leads'
+      fullPath: '/api/leads'
+      preLoaderRoute: typeof ApiLeadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/login': {
+      id: '/admin/login'
+      path: '/admin/login'
+      fullPath: '/admin/login'
+      preLoaderRoute: typeof AdminLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/upload': {
+      id: '/api/admin/upload'
+      path: '/api/admin/upload'
+      fullPath: '/api/admin/upload'
+      preLoaderRoute: typeof ApiAdminUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/seed': {
+      id: '/api/admin/seed'
+      path: '/api/admin/seed'
+      fullPath: '/api/admin/seed'
+      preLoaderRoute: typeof ApiAdminSeedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/quizzes': {
+      id: '/api/admin/quizzes'
+      path: '/api/admin/quizzes'
+      fullPath: '/api/admin/quizzes'
+      preLoaderRoute: typeof ApiAdminQuizzesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/quiz': {
+      id: '/api/admin/quiz'
+      path: '/api/admin/quiz'
+      fullPath: '/api/admin/quiz'
+      preLoaderRoute: typeof ApiAdminQuizRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/quizzes/$quizId': {
+      id: '/admin/quizzes/$quizId'
+      path: '/admin/quizzes/$quizId'
+      fullPath: '/admin/quizzes/$quizId'
+      preLoaderRoute: typeof AdminQuizzesQuizIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   OfertaRoute: OfertaRoute,
+  AdminLoginRoute: AdminLoginRoute,
+  ApiLeadsRoute: ApiLeadsRoute,
+  AdminIndexRoute: AdminIndexRoute,
+  AdminQuizzesQuizIdRoute: AdminQuizzesQuizIdRoute,
+  ApiAdminQuizRoute: ApiAdminQuizRoute,
+  ApiAdminQuizzesRoute: ApiAdminQuizzesRoute,
+  ApiAdminSeedRoute: ApiAdminSeedRoute,
+  ApiAdminUploadRoute: ApiAdminUploadRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

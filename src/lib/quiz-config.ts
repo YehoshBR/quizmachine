@@ -18,6 +18,10 @@ export interface QuizMeta {
   offerUrl: string;
   offerRouteByAnswer?: Record<string, string>;
   leadFields: LeadField[];
+  /** Cor primária do tema (qualquer valor CSS válido: hex, oklch(...), rgb(...)). Sobrescreve --primary. */
+  primaryColor?: string;
+  /** Cor secundária do tema. Sobrescreve --secondary. */
+  secondaryColor?: string;
 }
 
 export interface LeadField {

@@ -1,12 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { quizMeta } from "@/lib/quiz-config";
+import { getTenantQuiz } from "@/lib/tenant";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/oferta")({
-  head: () => ({
-    meta: [
-      { title: `Oferta — ${quizMeta.title}` },
-    ],
+  loader: () => getTenantQuiz(),
+  head: ({ loaderData }) => ({
+    meta: [{ title: `Oferta — ${loaderData?.quizMeta.title ?? "Quiz"}` }],
   }),
   component: OfertaPage,
 });
@@ -21,9 +20,13 @@ export const Route = createFileRoute("/oferta")({
 // que você já usa no Lovable — headline com <span className="text-primary">
 // destacando a palavra-chave, eyebrow em uppercase tracking-widest, e CTA
 // grande usando <Button> (já vem com o gradiente/brilho do tema).
+//
+// quizMeta vem do mesmo tenant (banco de dados) do quiz — troque o logo/cor
+// no painel administrativo e essa página reflete sozinha, sem redeploy.
 // ============================================================
 
 function OfertaPage() {
+  const { quizMeta } = Route.useLoaderData();
   return (
     <div className="min-h-screen bg-background">
       <header className="flex justify-center py-6">

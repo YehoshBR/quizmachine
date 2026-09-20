@@ -5,7 +5,8 @@ import { OptionCard, OptionLabel } from "@/components/QuizCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { screens, quizMeta, scoringMap, type Screen } from "@/lib/quiz-config";
+import type { QuizMeta, Screen } from "@/lib/quiz-config";
+import { getTenantQuiz } from "@/lib/tenant";
 import { ThemedLoader } from "@/components/ThemedLoader";
 import { YoutubeFacade } from "@/components/YoutubeFacade";
 
@@ -16,10 +17,11 @@ const onImgError = (e: React.SyntheticEvent<HTMLImageElement>) => {
 };
 
 export const Route = createFileRoute("/")({
-  head: () => ({
+  loader: () => getTenantQuiz(),
+  head: ({ loaderData }) => ({
     meta: [
-      { title: quizMeta.title },
-      { name: "description", content: quizMeta.description },
+      { title: loaderData?.quizMeta.title ?? "Quiz" },
+      { name: "description", content: loaderData?.quizMeta.description ?? "" },
     ],
   }),
   component: QuizPage,
@@ -28,7 +30,7 @@ export const Route = createFileRoute("/")({
 type Answers = Record<string, string | string[]>;
 
 /** Resolve a rota de oferta certa com base nas respostas, quando há LPs segmentadas. */
-function resolveOfferPath(answers: Answers): string {
+function resolveOfferPath(quizMeta: QuizMeta, answers: Answers): string {
   let offerPath = quizMeta.offerUrl;
   if (quizMeta.offerRouteByAnswer) {
     for (const [answerId, routes] of Object.entries(quizMeta.offerRouteByAnswer)) {
@@ -46,6 +48,7 @@ function resolveOfferPath(answers: Answers): string {
 // =================== MAIN QUIZ PAGE ===================
 function QuizPage() {
   const navigate = useNavigate();
+  const { id: quizId, quizMeta, screens, scoringMap } = Route.useLoaderData();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Answers>({});
   const [leadValues, setLeadValues] = useState<Record<string, string>>({});
@@ -81,7 +84,7 @@ function QuizPage() {
       if (pct >= 100) {
         clearInterval(i);
         setTimeout(() => {
-          navigate({ to: resolveOfferPath(answers) as "/" });
+          navigate({ to: resolveOfferPath(quizMeta, answers) as "/" });
         }, 300);
       }
     }, 60);
@@ -96,7 +99,8 @@ function QuizPage() {
     return (
       <AnalyzingScreen
         glyphs={loadingScreen?.glyphs}
-        onDone={() => navigate({ to: resolveOfferPath(answers) as "/" })}
+        expertName={quizMeta.expertName}
+        onDone={() => navigate({ to: resolveOfferPath(quizMeta, answers) as "/" })}
       />
     );
   }
@@ -372,6 +376,7 @@ function QuizPage() {
         onBack={back}
         onNext={next}
         answers={answers}
+        scoringMap={scoringMap}
       />
     );
   }
@@ -460,8 +465,30 @@ function QuizPage() {
               e.preventDefault();
               if (!valid || submitting) return;
               setSubmitting(true);
-              // TODO: salvar lead no Supabase (configurar SUPABASE_URL e SUPABASE_ANON_KEY)
-              // Por ora, vai direto para a tela de análise
+              try {
+                const params = new URLSearchParams(window.location.search);
+                const utm: Record<string, string> = {};
+                ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "fbclid", "gclid"].forEach(
+                  (k) => {
+                    const v = params.get(k);
+                    if (v) utm[k] = v;
+                  }
+                );
+                await fetch("/api/leads", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    quizId,
+                    name: leadValues["name"],
+                    email: leadValues["email"],
+                    whatsapp: leadValues["whatsapp"],
+                    answers: { ...answers, ...leadValues },
+                    utm,
+                  }),
+                });
+              } catch (err) {
+                console.error("Falha ao enviar lead (seguindo o funil mesmo assim):", err);
+              }
               setSubmitting(false);
               setAnalyzing(true);
             }}
@@ -508,12 +535,13 @@ type DiagScreenProps = {
   onBack: () => void;
   onNext: () => void;
   answers: Answers;
+  scoringMap: Record<string, Record<string, number>>;
 };
 
-function DiagnosisScreen({ screen, progress, onBack, onNext, answers }: DiagScreenProps) {
+function DiagnosisScreen({ screen, progress, onBack, onNext, answers, scoringMap }: DiagScreenProps) {
   const targetPct =
     screen.targetPct === "computed"
-      ? computeDiagnosisScore(answers)
+      ? computeDiagnosisScore(scoringMap, answers)
       : screen.targetPct;
 
   const [pct, setPct] = useState(0);
@@ -641,8 +669,10 @@ function DiagnosisScreen({ screen, progress, onBack, onNext, answers }: DiagScre
   );
 }
 
-function computeDiagnosisScore(answers: Answers): number {
-  // Usa o scoringMap exportado do quiz-config para calcular pontos reais
+function computeDiagnosisScore(
+  scoringMap: Record<string, Record<string, number>>,
+  answers: Answers
+): number {
   let points = 0;
   let maxPoints = 0;
   for (const [screenId, pointMap] of Object.entries(scoringMap)) {
@@ -913,11 +943,13 @@ function GaugeBar({ label, pct, color }: { label: string; pct: number; color: st
 function AnalyzingScreen({
   onDone,
   glyphs,
+  expertName: expertNameProp,
 }: {
   onDone: () => void;
   glyphs?: { id: string; d: string }[];
+  expertName?: string;
 }) {
-  const expertName = quizMeta.expertName ?? "nossos especialistas";
+  const expertName = expertNameProp ?? "nossos especialistas";
   const lines = [
     `Analisando o perfil que você construiu…`,
     `Cruzando com dados de resultado…`,

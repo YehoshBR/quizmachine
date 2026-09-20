@@ -8,7 +8,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import appCss from "../styles.css?url";
-import { quizMeta } from "@/lib/quiz-config";
+import { getTenantQuiz } from "@/lib/tenant";
 
 function NotFoundComponent() {
   return (
@@ -52,15 +52,28 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: quizMeta.title },
-      { name: "description", content: quizMeta.description },
-    ],
-    links: [{ rel: "stylesheet", href: appCss }],
-  }),
+  loader: () => getTenantQuiz(),
+  head: ({ loaderData }) => {
+    const quizMeta = loaderData?.quizMeta;
+    // Sobrescreve --primary/--secondary por tenant, direto no <head>, pra não
+    // ter flash da cor errada no primeiro paint (SSR já sai com a cor certa).
+    const themeCss =
+      quizMeta?.primaryColor || quizMeta?.secondaryColor
+        ? `:root{${quizMeta.primaryColor ? `--primary:${quizMeta.primaryColor};--ring:${quizMeta.primaryColor};` : ""}${
+            quizMeta.secondaryColor ? `--secondary:${quizMeta.secondaryColor};` : ""
+          }}`
+        : "";
+    return {
+      meta: [
+        { charSet: "utf-8" },
+        { name: "viewport", content: "width=device-width, initial-scale=1" },
+        { title: quizMeta?.title ?? "Quiz" },
+        { name: "description", content: quizMeta?.description ?? "" },
+      ],
+      links: [{ rel: "stylesheet", href: appCss }],
+      styles: themeCss ? [{ children: themeCss }] : [],
+    };
+  },
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
