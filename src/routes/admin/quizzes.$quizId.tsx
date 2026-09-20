@@ -102,7 +102,7 @@ function EditQuizPage() {
   const [uploading, setUploading] = useState(false);
   const [media, setMedia] = useState<{ url: string; filename: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const jsonFileInputRef = useRef<HTMLInputElement>(null);
+  const screensFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!toast) return;
@@ -265,6 +265,247 @@ function EditQuizPage() {
     }
   }
 
+  /** Ponto de entrada do botão "Importar arquivo": decide entre .json e .md/.txt. */
+  function handleImportFile(file: File) {
+    const isMarkdown = /\.(md|markdown|txt)$/i.test(file.name) || file.type === "text/markdown" || file.type === "text/plain";
+    if (isMarkdown) {
+      handleMarkdownFile(file);
+    } else {
+      handleJsonFile(file);
+    }
+  }
+
+  /**
+   * Converte o texto que a skill quiz-funnel-builder gera (blocos
+   * "TELA N — FASE | TIPO: ..." com headline/pergunta/opções em texto livre)
+   * pro formato de tela [Screen] deste motor. É um melhor-esforço: telas
+   * simples (single, intro, conteúdo, prova social, loading, depoimentos,
+   * lead) saem prontas; telas de seleção múltipla (o motor não usa múltipla
+   * escolha) e blocos de gráfico/diagnóstico ficam marcados com ⚠️ pra
+   * revisão manual no campo abaixo antes de salvar.
+   */
+  function parseMarkdownScreens(raw: string): { screens: Record<string, unknown>[]; reviewCount: number } {
+    type ParsedBlock = { n: number; fase: string; tipoRaw: string; bodyLines: string[]; options: { label: string; value: string }[] };
+
+    function extractOptions(lines: string[]): { options: { label: string; value: string }[]; rest: string[] } {
+      const optRe = /^\s*(?:[□☐▢▪✓✔•\-*]|\d+[.)])\s+(.*)$/;
+      const options: { label: string; value: string }[] = [];
+      const rest: string[] = [];
+      for (const line of lines) {
+        const m = line.match(optRe);
+        if (m && m[1].trim()) {
+          const label = m[1].trim();
+          const noEmoji = label.replace(/\p{Extended_Pictographic}/gu, "").trim();
+          options.push({ label, value: slugify(noEmoji || label) || `opcao_${options.length + 1}` });
+        } else {
+          rest.push(line);
+        }
+      }
+      return { options, rest };
+    }
+
+    function buildParagraphs(lines: string[]): string[] {
+      return lines
+        .join("\n")
+        .split(/\n{2,}/)
+        .map((p) => p.split("\n").map((l) => l.trim()).filter(Boolean).join("\n"))
+        .filter(Boolean);
+    }
+
+    function classifyScreenType(tipoRaw: string, bodyText: string, hasOptions: boolean) {
+      const t = tipoRaw.toLowerCase();
+      const b = bodyText.toLowerCase();
+      if (t.includes("intro")) return "intro";
+      if (t.includes("múltipla") || t.includes("multipla") || t.includes("multi-select")) return "multi-review";
+      if (t.includes("escala") || t.includes("concordância") || t.includes("concordancia")) return "scale";
+      if (t.includes("loading")) return "loading";
+      if (t.includes("diagnóstico") || t.includes("diagnostico") || b.includes("nível baixo") || b.includes("nivel baixo")) return "diagnosis";
+      if (t.includes("mirror") || (b.includes("esforço") && b.includes("resultado"))) return "mirror-chart";
+      if (t.includes("comparat") || (t.includes("antes") && t.includes("depois"))) return "compare";
+      if (t.includes("depoimentos") && !t.includes("prova social")) return "testimonials";
+      if (t.includes("prova social") || t.includes("whatsapp") || t.includes("social-proof") || t.includes("social proof")) return "social-proof";
+      if (t.includes("gate") || t.includes("captura") || t.includes("lead")) return "lead";
+      if (t.includes("única") || t.includes("unica") || t.includes("single")) return "single";
+      if (t.includes("conteúdo") || t.includes("conteudo") || t.includes("enquadramento") || t.includes("revelação") || t.includes("revelacao") || t.includes("quebra")) return "content";
+      return hasOptions ? "single" : "content";
+    }
+
+    function splitBlocks(text: string): ParsedBlock[] {
+      const noSep = text
+        .replace(/\r\n/g, "\n")
+        .split("\n")
+        .filter((l) => !/^[━=\-_*~]{5,}\s*$/.test(l.trim()))
+        .join("\n");
+      const parts = noSep
+        .split(/(?=^\s*TELA\s*\[?\s*\d+)/im)
+        .map((p) => p.trim())
+        .filter(Boolean);
+      return parts.map((part, i) => {
+        const lines = part.split("\n");
+        const header = lines[0] ?? "";
+        const hm = header.match(/TELA\s*\[?\s*(\d+)\s*\]?\s*[—\-–|]+\s*(.+?)\s*\|\s*TIPO:\s*(.+)/i);
+        const n = hm ? Number(hm[1]) : i + 1;
+        const fase = hm ? hm[2].trim() : "";
+        const tipoRaw = hm ? hm[3].trim() : "";
+        const rest = lines
+          .slice(1)
+          .filter((l) => !/^FUNÇÃO\s*:/i.test(l.trim()) && !/^PERSONALIZAÇÃO\s*:/i.test(l.trim()));
+        const { options, rest: bodyLines } = extractOptions(rest);
+        return { n, fase, tipoRaw, bodyLines, options };
+      });
+    }
+
+    function buildScreen(block: ParsedBlock): Record<string, unknown> {
+      const id = `t${block.n}_${slugify(block.fase) || "tela"}`;
+      const bodyLines = block.bodyLines.filter((l) => !/^\[\s*continuar\s*\]$/i.test(l.trim()));
+      const paragraphs = buildParagraphs(bodyLines);
+      const fullText = bodyLines.join("\n");
+      const hasOptions = block.options.length > 0;
+      const kind = classifyScreenType(block.tipoRaw, fullText, hasOptions);
+      const question = paragraphs[paragraphs.length - 1] ?? "";
+      const heading = paragraphs[0] ?? "";
+      const sub = paragraphs.length > 2 ? paragraphs[1] : undefined;
+      const options = block.options.map((o) => ({ value: o.value, label: o.label }));
+
+      switch (kind) {
+        case "intro":
+          return {
+            id, type: "intro",
+            headline: heading || question || `Tela ${block.n}`,
+            ...(sub ? { subheadline: sub } : {}),
+            firstQuestion: question || heading,
+            firstOptions: options,
+          };
+        case "single":
+          return { id, type: "single", question: question || heading || `Tela ${block.n}`, options };
+        case "scale":
+          return { id, type: "scale", question: heading || question || "Avalie o quanto você concorda:", statement: paragraphs[1] ?? question };
+        case "loading":
+          return {
+            id, type: "loading",
+            title: heading || "Preparando seu plano personalizado...",
+            lines: paragraphs.slice(1).length ? paragraphs.slice(1) : ["Analisando suas respostas...", "Quase pronto..."],
+            durationMs: 4000,
+          };
+        case "diagnosis": {
+          const cardDefs = [
+            { label: "Crença Central", re: /cren[çc]a\s+central\s*[:\-]\s*(.+)/i },
+            { label: "Sintoma Emocional", re: /sintoma\s+emocional\s*[:\-]\s*(.+)/i },
+            { label: "Conflito Interno", re: /conflito\s+interno\s*[:\-]\s*(.+)/i },
+            { label: "Padrão de Comportamento", re: /padr[ãa]o\s+de\s+comportamento\s*[:\-]\s*(.+)/i },
+          ];
+          const cards = cardDefs.map(({ label, re }) => {
+            const m = fullText.match(re);
+            return { label, name: m ? m[1].split("\n")[0].trim() : "A revisar", desc: "" };
+          });
+          return {
+            id, type: "diagnosis",
+            title: heading || "Sua probabilidade de resultado: NÍVEL BAIXO",
+            levels: ["Iniciante", "Em Formação", "Crescendo", "Pronto", "Expert"],
+            levelColors: ["bg-destructive", "bg-orange-500", "bg-amber-400", "bg-lime-400", "bg-emerald-500"],
+            label: "Você",
+            targetPct: 22,
+            cards,
+          };
+        }
+        case "compare": {
+          const rowRe = /^[-*•]?\s*\[?([^:%\n]{2,60}?)\]?\s*[:\-]?\s*(\d{1,3})\s*%.*?(\d{1,3})\s*%/;
+          const rows = bodyLines
+            .map((l) => l.match(rowRe))
+            .filter((m): m is RegExpMatchArray => !!m)
+            .map((m) => ({ label: m[1].trim(), beforePct: Number(m[2]), afterPct: Number(m[3]) }));
+          return {
+            id, type: "compare",
+            title: heading || "Veja a diferença de quem age:",
+            beforeLabel: "Antes", afterLabel: "Depois",
+            rows: rows.length ? rows : [{ label: "⚠️ A revisar — preencha as métricas", beforePct: 20, afterPct: 80 }],
+          };
+        }
+        case "mirror-chart": {
+          const pcts = Array.from(fullText.matchAll(/(\d{1,3})\s*%/g)).map((m) => Number(m[1]));
+          return {
+            id, type: "mirror-chart",
+            ...(paragraphs.length > 2 ? { intro: heading } : {}),
+            title: paragraphs.length > 2 ? paragraphs[1] : heading || "Antes de encontrar a solução...",
+            insight: paragraphs[paragraphs.length - 1] ?? "⚠️ A revisar",
+            effortPct: pcts[0] ?? 83,
+            resultPct: pcts[1] ?? 14,
+          };
+        }
+        case "testimonials": {
+          const itemRe = /^[-*•]?\s*([A-ZÀ-Ú][\wÀ-ú.\s]{1,30})[:\-–—]\s*"?(.+?)"?$/;
+          const items = bodyLines
+            .map((l) => l.match(itemRe))
+            .filter((m): m is RegExpMatchArray => !!m)
+            .map((m) => ({ name: m[1].trim(), text: m[2].trim() }));
+          return {
+            id, type: "testimonials",
+            title: heading || "Veja quem já transformou:",
+            items: items.length ? items : [{ name: "Depoimento", text: paragraphs.join(" ") || "⚠️ A revisar" }],
+          };
+        }
+        case "social-proof": {
+          const waMatch = fullText.match(/^([A-ZÀ-Ú][\wÀ-ú.\s]{1,30})[:\-–—]\s*"?(.+?)"?\s*$/m);
+          return {
+            id, type: "social-proof",
+            title: heading || "Veja o que estão dizendo:",
+            body: paragraphs.slice(1).join("\n\n") || paragraphs.join("\n\n") || "",
+            ...(waMatch ? { whatsapp: { author: waMatch[1].trim(), text: waMatch[2].trim(), meta: "" } } : {}),
+          };
+        }
+        case "lead":
+          return { id, type: "lead", title: heading || "Última etapa antes de receber seu plano", subtitle: paragraphs[1] };
+        case "multi-review":
+          return {
+            id, type: "content",
+            title: `⚠️ REVISAR MANUALMENTE (era seleção múltipla): ${heading || question || `Tela ${block.n}`}`,
+            body: [
+              "Esta tela era de seleção múltipla no texto original. Este motor não usa múltipla escolha —",
+              "divida em várias telas `single` (uma pergunta por item) antes de publicar. Opções originais:",
+              "",
+              ...block.options.map((o) => `- ${o.label}`),
+            ].join("\n"),
+          };
+        case "content":
+        default:
+          return {
+            id, type: "content",
+            title: heading || `Tela ${block.n}`,
+            body: (heading ? paragraphs.slice(1) : paragraphs).join("\n\n") || "",
+          };
+      }
+    }
+
+    const blocks = splitBlocks(raw);
+    const screens = blocks.map(buildScreen);
+    const reviewCount = screens.filter((s) => typeof s.title === "string" && (s.title as string).startsWith("⚠️")).length;
+    return { screens, reviewCount };
+  }
+
+  function handleMarkdownFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const raw = String(reader.result);
+      if (!/TELA\s*\[?\s*\d+/i.test(raw)) {
+        setToast({
+          kind: "error",
+          text: `Não reconheci o formato de "${file.name}". Esperado o texto gerado pela skill de quiz, com blocos "TELA 1 — FASE | TIPO: ...".`,
+        });
+        return;
+      }
+      const { screens, reviewCount } = parseMarkdownScreens(raw);
+      setScreensText(JSON.stringify(screens, null, 2));
+      setToast({
+        kind: "success",
+        text: `Carregado de "${file.name}": ${screens.length} tela(s) convertida(s).${
+          reviewCount > 0 ? ` ${reviewCount} tela(s) marcada(s) com ⚠️ precisam de revisão manual (ex: seleção múltipla ou gráficos).` : ""
+        } Confira o JSON embaixo antes de salvar.`,
+      });
+    };
+    reader.onerror = () => setToast({ kind: "error", text: `Não consegui ler o arquivo "${file.name}".` });
+    reader.readAsText(file);
+  }
+
   /** Lê um .json e tenta descobrir se é a lista de telas, o quizMeta, ou os dois juntos. */
   function handleJsonFile(file: File) {
     const reader = new FileReader();
@@ -357,7 +598,7 @@ function EditQuizPage() {
         <section className="rounded-2xl border border-primary/30 bg-primary/5 p-6">
           <h2 className="text-base font-bold text-foreground">Como usar essa página</h2>
           <ol className="mt-3 list-inside list-decimal space-y-1.5 text-sm text-foreground">
-            <li>Lá embaixo em <strong>"Telas do quiz"</strong>, clique em <strong>"Enviar arquivo .json"</strong> e escolha o arquivo com a narrativa/perguntas.</li>
+            <li>Lá embaixo em <strong>"Telas do quiz"</strong>, clique em <strong>"Importar arquivo"</strong> e escolha o <code className="rounded bg-muted px-1">.json</code> ou o <code className="rounded bg-muted px-1">.md</code> com a narrativa/perguntas.</li>
             <li>Preencha <strong>"Produto"</strong> (preço, link de pagamento, benefícios) — é sempre o mesmo produto, só preenche uma vez.</li>
             <li>Ajuste <strong>"Aparência"</strong> (cores, claro/escuro) se quiser.</li>
             <li>Marque <strong>Status = Publicado</strong> em "Configurações" quando estiver pronto pra ir ao ar.</li>
@@ -663,23 +904,34 @@ function EditQuizPage() {
         <section className="rounded-2xl border border-border bg-card p-6">
           <h2 className="text-base font-bold text-foreground">Telas do quiz (narrativa, perguntas, depoimentos)</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Envie o arquivo <code className="rounded bg-muted px-1">.json</code> com as telas geradas
-            (funciona tanto com uma lista <code className="rounded bg-muted px-1">[...]</code> de
-            telas quanto com um arquivo completo que tenha uma chave{" "}
-            <code className="rounded bg-muted px-1">"screens"</code>). Depois de carregar, o
-            conteúdo aparece no campo abaixo pra você conferir antes de salvar.
+            Importe o arquivo <code className="rounded bg-muted px-1">.json</code> com as telas
+            geradas (funciona tanto com uma lista <code className="rounded bg-muted px-1">[...]</code>{" "}
+            quanto com um objeto completo com a chave{" "}
+            <code className="rounded bg-muted px-1">"screens"</code>), ou direto o{" "}
+            <code className="rounded bg-muted px-1">.md</code>/<code className="rounded bg-muted px-1">.txt</code>{" "}
+            que a skill de quiz gera (os blocos "TELA 1 — FASE | TIPO: ..."). Telas mais complexas
+            (seleção múltipla, gráficos) vêm marcadas com ⚠️ pra você revisar. Depois de importar, o
+            conteúdo aparece no campo abaixo pra conferir antes de salvar.
           </p>
           <input
-            ref={jsonFileInputRef}
+            ref={screensFileInputRef}
             type="file"
-            accept=".json,application/json"
-            className="mt-3 text-sm"
+            accept=".json,application/json,.md,.markdown,text/markdown,.txt,text/plain"
+            className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) handleJsonFile(file);
-              if (jsonFileInputRef.current) jsonFileInputRef.current.value = "";
+              if (file) handleImportFile(file);
+              if (screensFileInputRef.current) screensFileInputRef.current.value = "";
             }}
           />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => screensFileInputRef.current?.click()}
+            className="mt-3"
+          >
+            📄 Importar arquivo (.json ou .md)
+          </Button>
           <p className="mt-3 text-xs text-muted-foreground">
             Ou edite direto aqui embaixo. Cole as URLs de imagem da seção "Imagens" nos campos{" "}
             <code className="rounded bg-muted px-1">image</code>. Vídeo é pelo ID do YouTube em{" "}
