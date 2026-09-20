@@ -97,6 +97,8 @@ function EditQuizPage() {
 
   const [toast, setToast] = useState<{ kind: "error" | "success"; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [provisioning, setProvisioning] = useState(false);
+  const VPS_IP = "85.31.60.46";
   const [uploading, setUploading] = useState(false);
   const [media, setMedia] = useState<{ url: string; filename: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -118,7 +120,7 @@ function EditQuizPage() {
     setSignals((s) => s.filter((_, idx) => idx !== i));
   }
 
-  async function handleSave() {
+  async function handleSave(): Promise<boolean> {
     setToast(null);
     let quizMetaParsed: Record<string, unknown>;
     let screensParsed: unknown;
@@ -126,17 +128,17 @@ function EditQuizPage() {
       quizMetaParsed = JSON.parse(quizMetaText);
     } catch (e) {
       setToast({ kind: "error", text: `O campo "Avançado" tem um JSON inválido: ${(e as Error).message}` });
-      return;
+      return false;
     }
     try {
       screensParsed = JSON.parse(screensText);
     } catch (e) {
       setToast({ kind: "error", text: `O campo "Telas do quiz" tem um JSON inválido: ${(e as Error).message}` });
-      return;
+      return false;
     }
     if (!Array.isArray(screensParsed)) {
       setToast({ kind: "error", text: `"Telas do quiz" precisa ser uma lista [ ] de telas.` });
-      return;
+      return false;
     }
 
     // Informações básicas
@@ -200,17 +202,44 @@ function EditQuizPage() {
         json = await res.json();
       } catch {
         setToast({ kind: "error", text: `O servidor respondeu algo inesperado (HTTP ${res.status}). Tente de novo.` });
-        return;
+        return false;
       }
       if (!res.ok || !json.ok) {
         setToast({ kind: "error", text: json.error ?? `Falha ao salvar (HTTP ${res.status}).` });
-      } else {
-        setToast({ kind: "success", text: "Salvo! Já está valendo no site publicado." });
+        return false;
       }
+      setToast({ kind: "success", text: "Salvo! Já está valendo no site publicado." });
+      return true;
     } catch (e) {
       setToast({ kind: "error", text: `Falha de rede ao salvar: ${(e as Error).message}` });
+      return false;
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handlePublishDomain() {
+    if (!domain.trim()) return;
+    const saved = await handleSave();
+    if (!saved) return;
+    setProvisioning(true);
+    setToast({ kind: "success", text: `Salvo. Verificando DNS e configurando "${domain}"...` });
+    try {
+      const res = await fetch("/api/admin/provision-domain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setToast({ kind: "success", text: `✅ ${json.message} Confira: https://${domain}` });
+      } else {
+        setToast({ kind: "error", text: json.error ?? "Falha ao publicar o domínio." });
+      }
+    } catch (e) {
+      setToast({ kind: "error", text: `Falha de rede ao publicar domínio: ${(e as Error).message}` });
+    } finally {
+      setProvisioning(false);
     }
   }
 
@@ -344,14 +373,30 @@ function EditQuizPage() {
               <Label>Nome interno</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" />
             </div>
-            <div>
+            <div className="sm:col-span-2">
               <Label>Domínio publicado</Label>
-              <Input
-                value={domain}
-                onChange={(e) => setDomain(e.target.value)}
-                placeholder="quiz.seudominio.com"
-                className="mt-1"
-              />
+              <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+                <Input
+                  value={domain}
+                  onChange={(e) => setDomain(e.target.value)}
+                  placeholder="quiz.seudominio.com"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handlePublishDomain}
+                  disabled={provisioning || !domain.trim()}
+                  className="shrink-0"
+                >
+                  {provisioning ? "Publicando..." : "Publicar domínio"}
+                </Button>
+              </div>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Antes de clicar: crie um registro <strong>tipo A</strong> pro domínio apontando pra{" "}
+                <code className="rounded bg-muted px-1">{VPS_IP}</code> no lugar onde você comprou
+                o domínio. Esse botão salva o quiz, confere se o DNS já propagou e, se sim,
+                configura o site e o certificado HTTPS sozinho.
+              </p>
             </div>
             <div>
               <Label>Nível</Label>

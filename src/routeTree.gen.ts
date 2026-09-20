@@ -18,6 +18,7 @@ import { Route as ApiAdminUploadRouteImport } from './routes/api/admin/upload'
 import { Route as ApiAdminSeedRouteImport } from './routes/api/admin/seed'
 import { Route as ApiAdminQuizzesRouteImport } from './routes/api/admin/quizzes'
 import { Route as ApiAdminQuizRouteImport } from './routes/api/admin/quiz'
+import { Route as ApiAdminProvisionDomainRouteImport } from './routes/api/admin/provision-domain'
 import { Route as AdminQuizzesQuizIdRouteImport } from './routes/admin/quizzes.$quizId'
 
 const OfertaRoute = OfertaRouteImport.update({
@@ -65,6 +66,11 @@ const ApiAdminQuizRoute = ApiAdminQuizRouteImport.update({
   path: '/api/admin/quiz',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminProvisionDomainRoute = ApiAdminProvisionDomainRouteImport.update({
+  id: '/api/admin/provision-domain',
+  path: '/api/admin/provision-domain',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminQuizzesQuizIdRoute = AdminQuizzesQuizIdRouteImport.update({
   id: '/admin/quizzes/$quizId',
   path: '/admin/quizzes/$quizId',
@@ -78,6 +84,7 @@ export interface FileRoutesByFullPath {
   '/api/leads': typeof ApiLeadsRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/quizzes/$quizId': typeof AdminQuizzesQuizIdRoute
+  '/api/admin/provision-domain': typeof ApiAdminProvisionDomainRoute
   '/api/admin/quiz': typeof ApiAdminQuizRoute
   '/api/admin/quizzes': typeof ApiAdminQuizzesRoute
   '/api/admin/seed': typeof ApiAdminSeedRoute
@@ -90,6 +97,7 @@ export interface FileRoutesByTo {
   '/api/leads': typeof ApiLeadsRoute
   '/admin': typeof AdminIndexRoute
   '/admin/quizzes/$quizId': typeof AdminQuizzesQuizIdRoute
+  '/api/admin/provision-domain': typeof ApiAdminProvisionDomainRoute
   '/api/admin/quiz': typeof ApiAdminQuizRoute
   '/api/admin/quizzes': typeof ApiAdminQuizzesRoute
   '/api/admin/seed': typeof ApiAdminSeedRoute
@@ -103,6 +111,7 @@ export interface FileRoutesById {
   '/api/leads': typeof ApiLeadsRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/quizzes/$quizId': typeof AdminQuizzesQuizIdRoute
+  '/api/admin/provision-domain': typeof ApiAdminProvisionDomainRoute
   '/api/admin/quiz': typeof ApiAdminQuizRoute
   '/api/admin/quizzes': typeof ApiAdminQuizzesRoute
   '/api/admin/seed': typeof ApiAdminSeedRoute
@@ -117,6 +126,7 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/admin/'
     | '/admin/quizzes/$quizId'
+    | '/api/admin/provision-domain'
     | '/api/admin/quiz'
     | '/api/admin/quizzes'
     | '/api/admin/seed'
@@ -129,6 +139,7 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/admin'
     | '/admin/quizzes/$quizId'
+    | '/api/admin/provision-domain'
     | '/api/admin/quiz'
     | '/api/admin/quizzes'
     | '/api/admin/seed'
@@ -141,6 +152,7 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/admin/'
     | '/admin/quizzes/$quizId'
+    | '/api/admin/provision-domain'
     | '/api/admin/quiz'
     | '/api/admin/quizzes'
     | '/api/admin/seed'
@@ -154,6 +166,7 @@ export interface RootRouteChildren {
   ApiLeadsRoute: typeof ApiLeadsRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminQuizzesQuizIdRoute: typeof AdminQuizzesQuizIdRoute
+  ApiAdminProvisionDomainRoute: typeof ApiAdminProvisionDomainRoute
   ApiAdminQuizRoute: typeof ApiAdminQuizRoute
   ApiAdminQuizzesRoute: typeof ApiAdminQuizzesRoute
   ApiAdminSeedRoute: typeof ApiAdminSeedRoute
@@ -225,6 +238,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminQuizRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/provision-domain': {
+      id: '/api/admin/provision-domain'
+      path: '/api/admin/provision-domain'
+      fullPath: '/api/admin/provision-domain'
+      preLoaderRoute: typeof ApiAdminProvisionDomainRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/quizzes/$quizId': {
       id: '/admin/quizzes/$quizId'
       path: '/admin/quizzes/$quizId'
@@ -242,6 +262,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLeadsRoute: ApiLeadsRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminQuizzesQuizIdRoute: AdminQuizzesQuizIdRoute,
+  ApiAdminProvisionDomainRoute: ApiAdminProvisionDomainRoute,
   ApiAdminQuizRoute: ApiAdminQuizRoute,
   ApiAdminQuizzesRoute: ApiAdminQuizzesRoute,
   ApiAdminSeedRoute: ApiAdminSeedRoute,
