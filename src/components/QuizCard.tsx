@@ -17,7 +17,7 @@ export function OptionCard({ selected, onClick, children, className, rounded = "
       className={cn(
         "group relative w-full overflow-hidden border bg-card text-left transition-all hover:border-primary/60 hover:shadow-sm",
         rounded === "full" ? "rounded-full" : "rounded-lg",
-        selected ? "border-primary shadow-sm" : "border-border",
+        selected ? "border-primary shadow-sm bg-primary/8" : "border-border",
         className,
       )}
     >

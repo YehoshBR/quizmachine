@@ -23,11 +23,14 @@ export function QuizLayout({ progress, onBack, children, className }: QuizLayout
               ←
             </button>
           )}
-          {typeof quizMeta.logo === "string" && quizMeta.logo.startsWith("/") ? (
-            <img src={quizMeta.logo} alt={quizMeta.logoAlt} className="h-10 w-auto" />
-          ) : (
-            <img src={quizMeta.logo as string} alt={quizMeta.logoAlt} className="h-10 w-auto" />
-          )}
+          <span className="rounded-lg bg-black px-2.5 py-1.5">
+            <img
+              src={quizMeta.logo as string}
+              alt={quizMeta.logoAlt}
+              className="block h-7 w-auto"
+              onError={(e) => { (e.target as HTMLImageElement).src = "/logo.svg"; }}
+            />
+          </span>
         </div>
         <div className="h-1.5 w-full bg-muted">
           <div

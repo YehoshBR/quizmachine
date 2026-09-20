@@ -34,7 +34,7 @@ As perguntas chegam em formato livre. Podem vir como texto corrido, lista numera
 ```
 [0] intro        ← Headline + 1ª pergunta embutida (gênero/perfil, COM imagens)
 [1] single       ← 2ª pergunta (idade/fase, COM imagens se possível)  
-[2..N-4] ...     ← Perguntas do funil (single, multi, scale, content, social-proof)
+[2..N-4] ...     ← Perguntas do funil (single, scale, content, social-proof)
 [N-3] diagnosis  ← Diagnóstico animado (nível/score)
 [N-2] compare    ← Comparação Antes x Depois
 [N-1] lead       ← Formulário de captação (nome + WhatsApp + campo personalizado)
@@ -44,9 +44,16 @@ As perguntas chegam em formato livre. Podem vir como texto corrido, lista numera
 **Regras fixas:**
 - A tela 0 (`intro`) SEMPRE embute a 1ª pergunta de seleção (gênero/perfil) com imagens
 - A tela 1 SEMPRE é seleção de idade ou fase de vida, com imagens quando possível
+- **Nunca use múltipla escolha.** Multi-select confunde o usuário sobre quando avançar e trava o funil.
+  Se o conteúdo original pedir "selecione tudo que se aplica", **divida em várias telas `single`
+  sequenciais** (uma pergunta por atributo/sintoma), cada uma avançando sozinha ao clicar.
+- Toda tela `single` avança sozinha ao clicar — nunca tem botão "Continuar". Mantenha no máximo
+  ~6 opções sem imagem (ou ~4 com imagem) por tela: o objetivo é o usuário nunca precisar rolar
+  a tela pra conseguir ver e tocar numa opção.
 - `mirror-chart` aparece 2-3 telas ANTES do diagnóstico (se existir)
 - `testimonials` aparecem ANTES do compare ou do diagnóstico
-- `social-proof` a cada 4-6 perguntas, nunca logo após formulário
+- `social-proof` a cada 4-6 perguntas, nunca logo após formulário — o usuário vai fornecer prints
+  e vídeos reais depois; enquanto isso, use `image`/`whatsapp`/`video` como placeholder com TODO
 - `lead` é SEMPRE penúltima tela (antes do loading final)
 - `loading` é SEMPRE a última tela, com duração 4000ms
 
@@ -56,7 +63,7 @@ As perguntas chegam em formato livre. Podem vir como texto corrido, lista numera
 |---|---|
 | Headline + 1ª pergunta com fotos de homem/mulher | `intro` |
 | Pergunta com 2-6 opções, avança sozinha | `single` |
-| "Selecione tudo que se aplica" / vários itens | `multi` |
+| "Selecione tudo que se aplica" / vários itens | **dividir em várias `single`** (uma por item) |
 | "Avalie o quanto concorda" / frases para avaliar | `scale` |
 | Dado de pesquisa / insight / bloco informativo | `content` |
 | Depoimento / print de WhatsApp / número impactante | `social-proof` |
@@ -136,18 +143,6 @@ offerRouteByAnswer: {
 }
 ```
 
-### `multi` — Múltipla escolha (requer botão Continuar)
-```typescript
-{
-  id: "sintomas",
-  type: "multi",
-  question: "Quais desses sintomas você já sentiu?",
-  subtitle: "Selecione tudo que se aplica",
-  options: [ /* mesma estrutura de single */ ],
-  minSelect: 1,
-}
-```
-
 ### `scale` — Escala Likert (avança sozinha)
 ```typescript
 {
@@ -189,6 +184,10 @@ offerRouteByAnswer: {
     text: "Finalmente consegui meu primeiro cliente!",
     meta: "hoje às 15:22",
   },
+  video: {                // opcional — depoimento em vídeo (capa clicável, nunca autoplay)
+    youtubeId: "dQw4w9WgXcQ",
+    label: "Depoimento da Maria",
+  },
 }
 ```
 
@@ -206,6 +205,11 @@ offerRouteByAnswer: {
     "Quase pronto...",
   ],
   durationMs: 4000,
+  // opcional — ícones do loading temático. Sem isso usa um conjunto neutro.
+  // Import de src/components/ThemedLoader.tsx: LOADER_GLYPHS_CABANA (imóveis/
+  // natureza/construção), LOADER_GLYPHS_MIND (mentalidade/espiritualidade),
+  // ou passe seu próprio array de { id, d } (path SVG numa caixa -18 a 18).
+  glyphs: LOADER_GLYPHS_CABANA,
 }
 ```
 
@@ -265,6 +269,7 @@ offerRouteByAnswer: {
     { name: "Carlos M.", text: "Saí do emprego em 2 meses. Não me arrependo." },
     { name: "Juliana S.", text: "O método é tão simples que meu marido também quis fazer." },
   ],
+  video: { youtubeId: "dQw4w9WgXcQ" }, // opcional — mesmo campo de social-proof
 }
 ```
 
@@ -303,12 +308,15 @@ offerRouteByAnswer: {
 - **Cards de opção:** `border border-border rounded-lg` com hover `border-primary/60`
 - **Barra de progresso:** gradiente `from-primary to-secondary`, altura `h-1.5`, top sticky
 - **Logo:** centralizado no header, `h-10 w-auto`
-- **Botões principais:** `h-12 w-full font-bold text-base`
+- **Fontes:** `--font-display` (Sora) nos títulos/headlines, `--font-body` (Inter) no resto —
+  tokens em `styles.css`. Troque só esses dois tokens se um quiz pedir tipografia diferente;
+  nunca hardcode `font-family` direto num componente.
+- **Botões principais:** `h-12 w-full font-bold text-base`, variante `default` já vem com
+  `.btn-vivid` (gradiente `primary → secondary → primary` + brilho, reage sozinho à paleta do quiz)
 - **Tipografia perguntas:** `text-xl font-bold` (mobile) / `sm:text-2xl`
-- **Auto-advance (single/scale):** 200ms após clique
-- **Multi:** botão "Continuar →" obrigatório, desabilitado se nenhum selecionado
+- **Auto-advance (single/scale):** 200ms após clique — nunca colocar botão "Continuar" numa tela `single`
 - **Scroll:** sempre volta ao topo ao mudar de tela (window.scrollTo top 0)
-- **Loading:** duração 4000ms padrão, animação com porcentagem
+- **Loading:** duração 4000ms padrão, ícones temáticos via `ThemedLoader` (ver `glyphs` na tela `loading`)
 - **Diagnosis:** animação easeOutCubic, 2200ms, marcador deslizante
 
 ---
@@ -328,6 +336,31 @@ offerRouteByAnswer: {
 2. Adicionar o import no `quiz-config.ts`: `import nomeDaImagem from "@/assets/nome.jpg"`
 3. Substituir o valor placeholder pela variável importada
 4. Remover o comentário `// TODO: substituir`
+
+---
+
+## Infraestrutura futura (ainda não implementada aqui)
+
+Vários quizzes de referência do usuário no Lovable já têm isso pronto e funcionando — a ideia é
+portar pra cá como motor genérico numa fase separada, não misturar com edição de estética:
+
+- **Teste A/B de headline** — 4 variantes de `headline`/`subheadline` na intro, split de tráfego,
+  painel `/admin` (login Google) com relatório de views/clicks/CTR por variante. Referência:
+  `src/lib/headline-ab.ts` + `src/hooks/use-headline.ts` + `src/routes/_authenticated/admin.tsx`
+  no projeto Lovable "Novo Operação MCE".
+- **Captura de lead real** — hoje o submit do formulário `lead` é um TODO vazio. Vai virar
+  Supabase (acesso salvo em memória) e/ou webhook. Referência: `src/routes/api/public/lead.ts`
+  (valida com zod, repassa pra webhook) no mesmo projeto.
+- **Analytics / heatmap** — sessão, cliques com coordenada relativa, tempo por tela, scroll depth,
+  visualizados num canvas de calor por tela no admin. Referência: `src/lib/tracking.ts` +
+  `src/components/admin/Heatmap.tsx` no projeto Lovable "Digital Start".
+- **Página de resultado personalizada pelas respostas** — hoje `/oferta` é estático. A ideia é ler
+  as respostas do quiz (dores/desejos) e montar um "perfil dominante" que personaliza a
+  apresentação da oferta (mesmo produto, discurso adaptado). Referência: `src/routes/resultado.tsx`
+  no projeto Lovable "Digital Start".
+
+Ao trabalhar na estética agora, não é preciso implementar nada disso — só evitar decisões que
+dificultem plugar depois (ex: manter o submit do `lead` numa função única fácil de trocar depois).
 
 ---
 

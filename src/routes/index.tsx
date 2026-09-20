@@ -5,7 +5,15 @@ import { OptionCard, OptionLabel } from "@/components/QuizCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { screens, quizMeta } from "@/lib/quiz-config";
+import { screens, quizMeta, scoringMap, type Screen } from "@/lib/quiz-config";
+import { ThemedLoader } from "@/components/ThemedLoader";
+import { YoutubeFacade } from "@/components/YoutubeFacade";
+
+const IMG_PLACEHOLDER =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect width='200' height='200' fill='%23e2e8f0'/%3E%3Ccircle cx='100' cy='78' r='42' fill='%2394a3b8'/%3E%3Cellipse cx='100' cy='178' rx='66' ry='46' fill='%2394a3b8'/%3E%3C/svg%3E";
+const onImgError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+  (e.target as HTMLImageElement).src = IMG_PLACEHOLDER;
+};
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -18,6 +26,22 @@ export const Route = createFileRoute("/")({
 });
 
 type Answers = Record<string, string | string[]>;
+
+/** Resolve a rota de oferta certa com base nas respostas, quando há LPs segmentadas. */
+function resolveOfferPath(answers: Answers): string {
+  let offerPath = quizMeta.offerUrl;
+  if (quizMeta.offerRouteByAnswer) {
+    for (const [answerId, routes] of Object.entries(quizMeta.offerRouteByAnswer)) {
+      const ans = answers[answerId] as string | undefined;
+      if (ans && routes) {
+        const routeMap = routes as unknown as Record<string, string>;
+        offerPath = routeMap[ans] ?? routeMap["_default"] ?? quizMeta.offerUrl;
+        break;
+      }
+    }
+  }
+  return offerPath;
+}
 
 // =================== MAIN QUIZ PAGE ===================
 function QuizPage() {
@@ -57,19 +81,7 @@ function QuizPage() {
       if (pct >= 100) {
         clearInterval(i);
         setTimeout(() => {
-          // Resolve offer URL from answers if segmented LPs are configured
-          let offerPath = quizMeta.offerUrl;
-          if (quizMeta.offerRouteByAnswer) {
-            for (const [answerId, routes] of Object.entries(quizMeta.offerRouteByAnswer)) {
-              const ans = answers[answerId] as string | undefined;
-              if (ans && routes) {
-                const routeMap = routes as unknown as Record<string, string>;
-                offerPath = routeMap[ans] ?? routeMap["_default"] ?? quizMeta.offerUrl;
-                break;
-              }
-            }
-          }
-          navigate({ to: offerPath as "/" });
+          navigate({ to: resolveOfferPath(answers) as "/" });
         }, 300);
       }
     }, 60);
@@ -78,9 +90,13 @@ function QuizPage() {
 
   // Analyzing → offer redirect
   if (analyzing) {
+    const loadingScreen = screens.find(
+      (s): s is Extract<Screen, { type: "loading" }> => s.type === "loading"
+    );
     return (
       <AnalyzingScreen
-        onDone={() => navigate({ to: quizMeta.offerUrl as "/" })}
+        glyphs={loadingScreen?.glyphs}
+        onDone={() => navigate({ to: resolveOfferPath(answers) as "/" })}
       />
     );
   }
@@ -90,7 +106,9 @@ function QuizPage() {
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <div className="flex justify-center pt-4">
-          <img src={quizMeta.logo as string} alt={quizMeta.logoAlt} className="h-14 w-auto" />
+          <span className="rounded-xl bg-black px-4 py-2.5">
+            <img src={quizMeta.logo as string} alt={quizMeta.logoAlt} className="block h-12 w-auto" onError={onImgError} />
+          </span>
         </div>
         <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center px-4 py-4 text-center">
           <h1 className="text-xl font-extrabold leading-tight text-foreground sm:text-2xl uppercase">
@@ -113,14 +131,13 @@ function QuizPage() {
                     setStep(1);
                   }}
                 >
-                  {opt.image && (
-                    <img
-                      src={opt.image}
-                      alt={opt.label}
-                      className="aspect-square w-full object-cover"
-                      loading="lazy"
-                    />
-                  )}
+                  <img
+                    src={opt.image ?? IMG_PLACEHOLDER}
+                    alt={opt.label}
+                    className="aspect-square w-full object-cover"
+                    loading="lazy"
+                    onError={onImgError}
+                  />
                   <OptionLabel selected={answers["intro_first"] === opt.value}>
                     {opt.label}
                   </OptionLabel>
@@ -178,6 +195,7 @@ function QuizPage() {
                       alt={opt.label}
                       className="aspect-square w-full object-cover"
                       loading="lazy"
+                      onError={onImgError}
                     />
                   )}
                   {opt.image ? (
@@ -193,46 +211,6 @@ function QuizPage() {
             })}
           </div>
         </div>
-      </QuizLayout>
-    );
-  }
-
-  // ─────────── MULTI ───────────
-  if (screen.type === "multi") {
-    const current = (answers[screen.id] as string[]) || [];
-    const minSelect = screen.minSelect ?? 1;
-    const toggle = (v: string) => {
-      const set = new Set(current);
-      if (set.has(v)) set.delete(v);
-      else set.add(v);
-      setAnswer(screen.id, Array.from(set));
-    };
-    return (
-      <QuizLayout progress={progress} onBack={back}>
-        <h2
-          className="mb-2 text-center text-xl font-bold text-foreground sm:text-2xl"
-          dangerouslySetInnerHTML={{ __html: screen.question.replace(/<hl>(.*?)<\/hl>/g, "<strong>$1</strong>") }}
-        />
-        <p className="mb-4 text-center text-sm text-muted-foreground">
-          {screen.subtitle ?? "Selecione todas que se aplicam"}
-        </p>
-        <div className="grid gap-2">
-          {screen.options.map((opt) => {
-            const selected = current.includes(opt.value);
-            return (
-              <OptionCard key={opt.value} selected={selected} onClick={() => toggle(opt.value)}>
-                <OptionLabel selected={selected}>{opt.label}</OptionLabel>
-              </OptionCard>
-            );
-          })}
-        </div>
-        <Button
-          className="mt-6 h-12 w-full text-base font-bold"
-          onClick={next}
-          disabled={current.length < minSelect}
-        >
-          Continuar →
-        </Button>
       </QuizLayout>
     );
   }
@@ -290,7 +268,7 @@ function QuizPage() {
           <h2 className="text-xl font-bold text-foreground sm:text-2xl">{screen.title}</h2>
           {screen.image && (
             <div className="my-3 overflow-hidden rounded-xl border border-border shadow-sm">
-              <img src={screen.image} alt="" className="w-full object-contain" loading="lazy" />
+              <img src={screen.image} alt="" className="w-full object-contain" loading="lazy" onError={onImgError} />
             </div>
           )}
           <p className="mt-4 whitespace-pre-line text-base leading-relaxed text-muted-foreground">
@@ -334,7 +312,7 @@ function QuizPage() {
 
           {screen.image && (
             <div className="mt-4 overflow-hidden rounded-xl border border-border shadow-sm">
-              <img src={screen.image} alt="Prova social" className="w-full object-contain" loading="lazy" />
+              <img src={screen.image} alt="Prova social" className="w-full object-contain" loading="lazy" onError={onImgError} />
             </div>
           )}
 
@@ -348,6 +326,14 @@ function QuizPage() {
                 {screen.whatsapp.meta}
               </p>
             </div>
+          )}
+
+          {screen.video && (
+            <YoutubeFacade
+              videoId={screen.video.youtubeId}
+              label={screen.video.label}
+              className="mt-4"
+            />
           )}
 
           <Button className="mt-6 h-12 w-full text-base font-bold" onClick={next}>
@@ -368,17 +354,7 @@ function QuizPage() {
       <QuizLayout progress={progress}>
         <div className="rounded-2xl bg-card p-8 text-center shadow-sm">
           <h2 className="text-xl font-bold text-foreground sm:text-2xl">{screen.title}</h2>
-          <div className="my-8">
-            <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full bg-gradient-to-r from-primary to-secondary transition-all"
-                style={{ width: `${loadingPct}%` }}
-              />
-            </div>
-            <p className="mt-3 text-3xl font-extrabold text-primary">
-              {Math.round(loadingPct)}%
-            </p>
-          </div>
+          <ThemedLoader pct={loadingPct} glyphs={screen.glyphs} className="my-8" />
           <p className="mt-3 min-h-[2rem] animate-pulse text-sm font-medium text-primary">
             {screen.lines[lineIdx]}
           </p>
@@ -427,6 +403,13 @@ function QuizPage() {
             </div>
           ))}
         </div>
+        {screen.video && (
+          <YoutubeFacade
+            videoId={screen.video.youtubeId}
+            label={screen.video.label}
+            className="mt-4"
+          />
+        )}
         <Button className="mt-6 h-12 w-full text-base font-bold" onClick={next}>
           Continuar →
         </Button>
@@ -465,6 +448,7 @@ function QuizPage() {
               alt={quizMeta.expertName ?? "Expert"}
               className="my-5 mx-auto h-32 w-32 rounded-full object-cover shadow-md"
               loading="lazy"
+              onError={onImgError}
             />
           )}
           {screen.subtitle && (
@@ -658,21 +642,19 @@ function DiagnosisScreen({ screen, progress, onBack, onNext, answers }: DiagScre
 }
 
 function computeDiagnosisScore(answers: Answers): number {
-  // Calcula um score baseado nas respostas — personalize conforme o quiz
-  const positiveValues = ["sim", "muito", "sempre", "fogo", "comprometido", "pronto"];
-  let score = 0;
-  let total = 0;
-  for (const val of Object.values(answers)) {
-    if (Array.isArray(val)) {
-      total += val.length;
-      score += val.filter((v) => positiveValues.some((p) => v.includes(p))).length;
-    } else {
-      total += 1;
-      if (positiveValues.some((p) => val.includes(p))) score += 1;
+  // Usa o scoringMap exportado do quiz-config para calcular pontos reais
+  let points = 0;
+  let maxPoints = 0;
+  for (const [screenId, pointMap] of Object.entries(scoringMap)) {
+    const answer = answers[screenId] as string | undefined;
+    const vals = Object.values(pointMap);
+    maxPoints += vals.length > 0 ? Math.max(...vals) : 0;
+    if (answer !== undefined) {
+      points += pointMap[answer] ?? 0;
     }
   }
-  const base = total > 0 ? (score / total) * 100 : 70;
-  return Math.min(96, Math.max(54, Math.round(base)));
+  if (maxPoints === 0) return 70;
+  return Math.round((points / maxPoints) * 100);
 }
 
 // =================== COMPARE SCREEN ===================
@@ -928,7 +910,13 @@ function GaugeBar({ label, pct, color }: { label: string; pct: number; color: st
 }
 
 // =================== ANALYZING SCREEN ===================
-function AnalyzingScreen({ onDone }: { onDone: () => void }) {
+function AnalyzingScreen({
+  onDone,
+  glyphs,
+}: {
+  onDone: () => void;
+  glyphs?: { id: string; d: string }[];
+}) {
   const expertName = quizMeta.expertName ?? "nossos especialistas";
   const lines = [
     `Analisando o perfil que você construiu…`,
@@ -959,34 +947,19 @@ function AnalyzingScreen({ onDone }: { onDone: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-b from-background via-background to-muted px-6 text-center">
-      <div className="relative mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-primary/10 text-primary">
-        <svg className="h-12 w-12 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-        </svg>
-      </div>
       <p className="mb-1 text-xs uppercase tracking-widest text-primary font-bold">
         Processando Análise Personalizada
       </p>
       <h1 className="mb-3 max-w-md text-2xl font-extrabold leading-tight text-foreground sm:text-3xl">
         Estamos preparando seu diagnóstico personalizado…
       </h1>
-      <p className="mb-6 max-w-sm text-sm text-muted-foreground">
+      <p className="mb-2 max-w-sm text-sm text-muted-foreground">
         Não feche esta página. O resultado pode revelar algo que você ainda não sabe.
       </p>
-      <div className="w-full max-w-sm">
-        <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full bg-gradient-to-r from-primary via-secondary to-primary transition-all"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-        <p className="mt-2 text-2xl font-extrabold text-primary tabular-nums">{Math.round(pct)}%</p>
-        <p className="mt-3 min-h-[2.5rem] animate-pulse text-sm font-medium text-foreground">
-          {lines[idx]}
-        </p>
-      </div>
+      <ThemedLoader pct={pct} glyphs={glyphs} className="w-full max-w-sm" />
+      <p className="mt-3 min-h-[2.5rem] max-w-sm animate-pulse text-sm font-medium text-foreground">
+        {lines[idx]}
+      </p>
       <div className="mt-8 flex items-center gap-2 text-xs text-muted-foreground font-medium">
         <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
         Configurando protocolo exclusivo…
