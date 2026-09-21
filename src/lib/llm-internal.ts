@@ -1,48 +1,51 @@
 // ============================================================
-// llm-internal.ts — SEMPRE server-only. Chama a API da Anthropic direto via
+// llm-internal.ts — SEMPRE server-only. Chama a API da OpenAI direto via
 // fetch (sem SDK) pra tarefas de geração/análise de texto no servidor
 // (extração de dores/desejos, geração de headline pro teste A/B).
 //
-// Requer ANTHROPIC_API_KEY em .env.production — conta separada da sessão do
-// Claude Code, pega em https://console.anthropic.com/settings/keys. Sem a
-// chave configurada, retorna erro claro em vez de quebrar o painel.
+// Requer OPENAI_API_KEY em .env.production — pega em
+// https://platform.openai.com/api-keys. Sem a chave configurada, retorna
+// erro claro em vez de quebrar o painel. Modelo trocável via OPENAI_MODEL
+// (padrão: gpt-4o-mini, barato o suficiente pra essas tarefas).
 // ============================================================
-const ANTHROPIC_API_BASE = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-haiku-4-5-20251001";
+const OPENAI_API_BASE = "https://api.openai.com/v1/chat/completions";
+const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
 export type LlmResult = { ok: true; text: string } | { ok: false; error: string };
 
-export async function callAnthropic(system: string, userMessage: string, maxTokens = 2000): Promise<LlmResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+export async function callLlm(system: string, userMessage: string, maxTokens = 2000): Promise<LlmResult> {
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    return { ok: false, error: "ANTHROPIC_API_KEY não configurada no servidor (.env.production)." };
+    return { ok: false, error: "OPENAI_API_KEY não configurada no servidor (.env.production)." };
   }
   try {
-    const res = await fetch(ANTHROPIC_API_BASE, {
+    const res = await fetch(OPENAI_API_BASE, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: MODEL,
         max_tokens: maxTokens,
-        system,
-        messages: [{ role: "user", content: userMessage }],
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: userMessage },
+        ],
       }),
       signal: AbortSignal.timeout(60_000),
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      return { ok: false, error: `Anthropic API respondeu HTTP ${res.status}: ${text.slice(0, 300)}` };
+      return { ok: false, error: `OpenAI API respondeu HTTP ${res.status}: ${text.slice(0, 300)}` };
     }
-    const json = (await res.json()) as { content?: { type: string; text?: string }[] };
-    const text = json.content?.find((c) => c.type === "text")?.text ?? "";
-    if (!text) return { ok: false, error: "Anthropic API respondeu sem texto." };
+    const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const text = json.choices?.[0]?.message?.content ?? "";
+    if (!text) return { ok: false, error: "OpenAI API respondeu sem texto." };
     return { ok: true, text };
   } catch (err) {
-    return { ok: false, error: `Falha ao chamar a Anthropic API: ${(err as Error).message}` };
+    return { ok: false, error: `Falha ao chamar a OpenAI API: ${(err as Error).message}` };
   }
 }
 

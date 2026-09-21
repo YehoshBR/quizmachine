@@ -3,7 +3,7 @@
 // precisar montar isso à mão. Sempre revisável no painel antes de salvar.
 import { createFileRoute } from "@tanstack/react-router";
 import { isAuthenticated } from "@/lib/auth-internal";
-import { callAnthropic, extractJson } from "@/lib/llm-internal";
+import { callLlm, extractJson } from "@/lib/llm-internal";
 
 const SYSTEM_PROMPT = `Você analisa a narrativa de um quiz de vendas (quiz funnel) e identifica as
 dores e desejos que ele usa pra persuadir o lead. Sua tarefa: ler as telas e opções, e devolver:
@@ -62,7 +62,7 @@ export const Route = createFileRoute("/api/admin/extract-signals")({
         });
 
         const userMessage = JSON.stringify({ product, screens: slim });
-        const result = await callAnthropic(SYSTEM_PROMPT, userMessage, 3000);
+        const result = await callLlm(SYSTEM_PROMPT, userMessage, 3000);
         if (!result.ok) {
           return Response.json({ ok: false, error: result.error }, { status: 502 });
         }

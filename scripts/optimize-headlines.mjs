@@ -7,7 +7,7 @@
 //   1. Calcula CTR (view->cta_click) e, quando há dado suficiente, taxa de
 //      lead e de clique em checkout por variante.
 //   2. Pausa variantes claramente perdendo (evita desperdiçar tráfego).
-//   3. Se ANTHROPIC_API_KEY estiver configurada, gera 1 headline nova
+//   3. Se OPENAI_API_KEY estiver configurada, gera 1 headline nova
 //      inspirada na vencedora, pra manter o teste sempre rodando.
 // Nunca lança — problema numa etapa vira log e segue pro próximo quiz.
 // ============================================================
@@ -16,36 +16,44 @@ import pg from "pg";
 const MIN_SAMPLE = 30; // views mínimas antes de decidir qualquer coisa sobre uma variante
 const LOSER_RATIO = 0.6; // variante com métrica <= 60% da líder é considerada perdedora
 const MAX_ACTIVE_VARIANTS = 3; // não deixa crescer sem limite
-const ANTHROPIC_API_BASE = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-haiku-4-5-20251001";
+const OPENAI_API_BASE = "https://api.openai.com/v1/chat/completions";
+const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
 function log(...args) {
   console.log(`[optimize-headlines] ${new Date().toISOString()}`, ...args);
 }
 
-async function callAnthropic(system, userMessage) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+async function callLlm(system, userMessage) {
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
   try {
-    const res = await fetch(ANTHROPIC_API_BASE, {
+    const res = await fetch(OPENAI_API_BASE, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model: MODEL, max_tokens: 500, system, messages: [{ role: "user", content: userMessage }] }),
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 500,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: userMessage },
+        ],
+      }),
       signal: AbortSignal.timeout(60_000),
     });
     if (!res.ok) {
-      log("Anthropic API respondeu HTTP", res.status, await res.text().catch(() => ""));
+      log("OpenAI API respondeu HTTP", res.status, await res.text().catch(() => ""));
       return null;
     }
     const json = await res.json();
-    const text = json.content?.find((c) => c.type === "text")?.text ?? "";
+    const text = json.choices?.[0]?.message?.content ?? "";
     const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
     const candidate = fenced ? fenced[1] : text;
     const start = candidate.indexOf("{");
     if (start === -1) return null;
     return JSON.parse(candidate.slice(start, candidate.lastIndexOf("}") + 1));
   } catch (err) {
-    log("falha ao chamar Anthropic:", err.message);
+    log("falha ao chamar OpenAI:", err.message);
     return null;
   }
 }
@@ -142,8 +150,8 @@ async function processQuiz(pool, quiz) {
 
   const activeCount = stats.filter((s) => !s.variant.is_paused).length + (leader.variant.is_paused ? 1 : 0);
   if (activeCount >= MAX_ACTIVE_VARIANTS) return;
-  if (!process.env.ANTHROPIC_API_KEY) {
-    log(`  (ANTHROPIC_API_KEY não configurada — pulando geração de nova variante)`);
+  if (!process.env.OPENAI_API_KEY) {
+    log(`  (OPENAI_API_KEY não configurada — pulando geração de nova variante)`);
     return;
   }
 
@@ -157,7 +165,7 @@ com JSON: {"headline": "...", "subheadline": "..."} — sem markdown, sem texto 
     headline_vencedora_atual: leader.variant.headline,
     instrucao: "Gere UMA nova variante de headline inspirada na vencedora acima, mas com ângulo diferente (não repita as mesmas palavras), pra testar contra ela.",
   });
-  const generated = await callAnthropic(system, userMessage);
+  const generated = await callLlm(system, userMessage);
   if (!generated?.headline) {
     log(`  falha ao gerar nova variante via IA.`);
     return;
