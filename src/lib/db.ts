@@ -179,3 +179,220 @@ export async function listMediaAssets(quizId: string): Promise<
   );
   return rows;
 }
+
+// ============================================================
+// TESTE A/B DE HEADLINE + ANALYTICS
+// ============================================================
+
+export type HeadlineVariant = {
+  id: string;
+  quiz_id: string;
+  label: string;
+  headline: string;
+  subheadline: string | null;
+  is_paused: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function listHeadlineVariants(quizId: string): Promise<HeadlineVariant[]> {
+  const db = getPool();
+  if (!db) return [];
+  const { rows } = await db.query<HeadlineVariant>(
+    `select * from headline_variants where quiz_id = $1 order by created_at asc`,
+    [quizId]
+  );
+  return rows;
+}
+
+/** Só as variantes ativas — usada pra sortear qual headline mostrar num visitante novo. */
+export async function listActiveHeadlineVariants(quizId: string): Promise<HeadlineVariant[]> {
+  const db = getPool();
+  if (!db) return [];
+  const { rows } = await db.query<HeadlineVariant>(
+    `select * from headline_variants where quiz_id = $1 and is_paused = false order by created_at asc`,
+    [quizId]
+  );
+  return rows;
+}
+
+export async function createHeadlineVariant(input: {
+  quizId: string;
+  label: string;
+  headline: string;
+  subheadline?: string;
+}): Promise<HeadlineVariant> {
+  const db = getPool();
+  if (!db) throw new Error("DATABASE_URL não configurado");
+  const { rows } = await db.query<HeadlineVariant>(
+    `insert into headline_variants (quiz_id, label, headline, subheadline) values ($1,$2,$3,$4) returning *`,
+    [input.quizId, input.label, input.headline, input.subheadline ?? null]
+  );
+  return rows[0];
+}
+
+export async function updateHeadlineVariant(
+  id: string,
+  patch: Partial<{ label: string; headline: string; subheadline: string | null; isPaused: boolean }>
+): Promise<HeadlineVariant> {
+  const db = getPool();
+  if (!db) throw new Error("DATABASE_URL não configurado");
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  let i = 1;
+  const map: Record<string, unknown> = {
+    label: patch.label,
+    headline: patch.headline,
+    subheadline: patch.subheadline,
+    is_paused: patch.isPaused,
+  };
+  for (const [col, val] of Object.entries(map)) {
+    if (val === undefined) continue;
+    fields.push(`${col} = $${i}`);
+    values.push(val);
+    i++;
+  }
+  fields.push(`updated_at = now()`);
+  values.push(id);
+  const { rows } = await db.query<HeadlineVariant>(
+    `update headline_variants set ${fields.join(", ")} where id = $${i} returning *`,
+    values
+  );
+  return rows[0];
+}
+
+export async function deleteHeadlineVariant(id: string): Promise<void> {
+  const db = getPool();
+  if (!db) throw new Error("DATABASE_URL não configurado");
+  await db.query(`delete from headline_variants where id = $1`, [id]);
+}
+
+/** Registra (ou ignora, se já existir) a sessão de um visitante — 1 linha por (quiz, session_id). */
+export async function upsertQuizSession(input: {
+  quizId: string;
+  sessionId: string;
+  variantId?: string | null;
+  deviceType?: string;
+  userAgent?: string;
+  referrer?: string;
+  utm?: Record<string, unknown>;
+}): Promise<void> {
+  const db = getPool();
+  if (!db) return;
+  await db.query(
+    `insert into quiz_sessions (quiz_id, session_id, variant_id, device_type, user_agent, referrer, utm)
+     values ($1,$2,$3,$4,$5,$6,$7)
+     on conflict (quiz_id, session_id) do nothing`,
+    [
+      input.quizId,
+      input.sessionId,
+      input.variantId ?? null,
+      input.deviceType ?? null,
+      input.userAgent ?? null,
+      input.referrer ?? null,
+      JSON.stringify(input.utm ?? {}),
+    ]
+  );
+}
+
+export async function insertHeadlineEvent(input: {
+  variantId: string;
+  sessionId: string;
+  eventType: "view" | "cta_click";
+}): Promise<void> {
+  const db = getPool();
+  if (!db) return;
+  await db.query(
+    `insert into headline_events (variant_id, session_id, event_type) values ($1,$2,$3)`,
+    [input.variantId, input.sessionId, input.eventType]
+  );
+}
+
+export async function insertQuizEvent(input: {
+  quizId: string;
+  sessionId: string;
+  eventType: string;
+  screenId?: string;
+  stepIndex?: number;
+  data?: Record<string, unknown>;
+}): Promise<void> {
+  const db = getPool();
+  if (!db) return;
+  await db.query(
+    `insert into quiz_events (quiz_id, session_id, screen_id, step_index, event_type, data)
+     values ($1,$2,$3,$4,$5,$6)`,
+    [
+      input.quizId,
+      input.sessionId,
+      input.screenId ?? null,
+      input.stepIndex ?? null,
+      input.eventType,
+      JSON.stringify(input.data ?? {}),
+    ]
+  );
+}
+
+/** Quantas sessões distintas chegaram (deram "screen_view") em cada tela — base do relatório de abandono por tela. */
+export async function getScreenFunnelStats(
+  quizId: string
+): Promise<{ screenId: string; stepIndex: number; reached: number }[]> {
+  const db = getPool();
+  if (!db) return [];
+  const { rows } = await db.query<{ screen_id: string; step_index: number; reached: string }>(
+    `select screen_id, step_index, count(distinct session_id) as reached
+     from quiz_events
+     where quiz_id = $1 and event_type = 'screen_view' and screen_id is not null and step_index is not null
+     group by screen_id, step_index
+     order by step_index asc`,
+    [quizId]
+  );
+  return rows.map((r) => ({ screenId: r.screen_id, stepIndex: r.step_index, reached: Number(r.reached) }));
+}
+
+export type HeadlineStat = {
+  variant: HeadlineVariant;
+  views: number;
+  ctaClicks: number;
+  leads: number;
+  checkoutClicks: number;
+};
+
+/** Estatísticas de cada variante — pro painel mostrar e o cron de otimização decidir. */
+export async function getHeadlineStats(quizId: string): Promise<HeadlineStat[]> {
+  const db = getPool();
+  if (!db) return [];
+  const variants = await listHeadlineVariants(quizId);
+  if (variants.length === 0) return [];
+  const { rows } = await db.query<{
+    variant_id: string;
+    views: string;
+    cta_clicks: string;
+    leads: string;
+    checkout_clicks: string;
+  }>(
+    `select
+       v.id as variant_id,
+       count(distinct case when he.event_type = 'view' then he.id end) as views,
+       count(distinct case when he.event_type = 'cta_click' then he.id end) as cta_clicks,
+       count(distinct case when qe.event_type = 'lead_submitted' then qe.id end) as leads,
+       count(distinct case when qe.event_type = 'checkout_click' then qe.id end) as checkout_clicks
+     from headline_variants v
+     left join headline_events he on he.variant_id = v.id
+     left join quiz_sessions qs on qs.variant_id = v.id
+     left join quiz_events qe on qe.quiz_id = qs.quiz_id and qe.session_id = qs.session_id
+     where v.quiz_id = $1
+     group by v.id`,
+    [quizId]
+  );
+  const byId = new Map(rows.map((r) => [r.variant_id, r]));
+  return variants.map((variant) => {
+    const r = byId.get(variant.id);
+    return {
+      variant,
+      views: Number(r?.views ?? 0),
+      ctaClicks: Number(r?.cta_clicks ?? 0),
+      leads: Number(r?.leads ?? 0),
+      checkoutClicks: Number(r?.checkout_clicks ?? 0),
+    };
+  });
+}

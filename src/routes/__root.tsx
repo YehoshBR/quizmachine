@@ -45,6 +45,22 @@ function buildThemeCss(quizMeta: QuizMeta | undefined): string {
   return tokens.length ? `:root{${tokens.join(";")}}` : "";
 }
 
+/** Monta os scripts de rastreamento configurados no painel (Pixel + script customizado). */
+function buildTrackingScripts(quizMeta: QuizMeta | undefined): { children: string }[] {
+  if (!quizMeta) return [];
+  const scripts: { children: string }[] = [];
+  const pixelId = quizMeta.facebookPixelId?.replace(/[^0-9]/g, "");
+  if (pixelId) {
+    scripts.push({
+      children: `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${pixelId}');fbq('track','PageView');`,
+    });
+  }
+  if (quizMeta.customHeadScript?.trim()) {
+    scripts.push({ children: quizMeta.customHeadScript });
+  }
+  return scripts;
+}
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -102,6 +118,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       ],
       links: [{ rel: "stylesheet", href: appCss }],
       styles: themeCss ? [{ children: themeCss }] : [],
+      scripts: buildTrackingScripts(quizMeta),
     };
   },
   shellComponent: RootShell,

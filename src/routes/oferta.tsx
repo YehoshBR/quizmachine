@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createElement, Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { getTenantQuiz } from "@/lib/tenant";
 import { computeTopSignals, readPersistedAnswers } from "@/lib/signals";
+import { trackEvent } from "@/lib/tracking";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/oferta")({
@@ -82,7 +83,7 @@ function useCountdown(totalSeconds: number) {
 }
 
 function OfertaPage() {
-  const { quizMeta, screens } = Route.useLoaderData();
+  const { id: quizId, quizMeta, screens } = Route.useLoaderData();
   const product = quizMeta.product;
   const countdown = useCountdown(20 * 60);
 
@@ -106,7 +107,7 @@ function OfertaPage() {
   const subheadline = topPain?.body ?? product?.promise ?? "Configure quizMeta.product no painel pra ativar essa página.";
 
   function trackCheckout() {
-    // espaço reservado: quando o agente/analytics entrar, registrar aqui o clique de checkout
+    if (quizId) trackEvent(quizId, "checkout_click", { data: { url: checkoutUrl } });
   }
 
   return (

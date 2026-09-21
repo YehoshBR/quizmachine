@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import type { QuizMeta, Screen } from "@/lib/quiz-config";
 import { getTenantQuiz } from "@/lib/tenant";
 import { persistAnswers } from "@/lib/signals";
+import { trackSession, trackHeadlineEvent, trackEvent, getOrCreateSessionId } from "@/lib/tracking";
 import { ThemedLoader } from "@/components/ThemedLoader";
 import { YoutubeFacade } from "@/components/YoutubeFacade";
 
@@ -49,7 +50,7 @@ function resolveOfferPath(quizMeta: QuizMeta, answers: Answers): string {
 // =================== MAIN QUIZ PAGE ===================
 function QuizPage() {
   const navigate = useNavigate();
-  const { id: quizId, quizMeta, screens, scoringMap } = Route.useLoaderData();
+  const { id: quizId, quizMeta, screens, scoringMap, variant } = Route.useLoaderData();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Answers>({});
   const [leadValues, setLeadValues] = useState<Record<string, string>>({});
@@ -72,6 +73,21 @@ function QuizPage() {
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [step]);
+
+  // Sessão + teste A/B de headline — dispara 1x quando o quiz carrega.
+  useEffect(() => {
+    if (!quizId) return;
+    trackSession(quizId, variant?.id);
+    if (variant?.id) trackHeadlineEvent(variant.id, "view");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quizId]);
+
+  // Abandono por tela — 1 evento por tela alcançada, pra achar onde o funil trava.
+  useEffect(() => {
+    if (!quizId || !screen) return;
+    trackEvent(quizId, "screen_view", { screenId: screen.id, stepIndex: step });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quizId, step, screen?.id]);
 
   // Loading screen animation
   useEffect(() => {
@@ -109,6 +125,8 @@ function QuizPage() {
 
   // ─────────── INTRO ───────────
   if (screen.type === "intro") {
+    const headline = variant?.headline ?? screen.headline;
+    const subheadline = variant?.subheadline ?? screen.subheadline;
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <div className="flex justify-center pt-4">
@@ -118,10 +136,10 @@ function QuizPage() {
         </div>
         <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center px-4 py-4 text-center">
           <h1 className="text-xl font-extrabold leading-tight text-foreground sm:text-2xl uppercase">
-            {screen.headline}
+            {headline}
           </h1>
-          {screen.subheadline && (
-            <p className="mt-4 text-base text-muted-foreground">{screen.subheadline}</p>
+          {subheadline && (
+            <p className="mt-4 text-base text-muted-foreground">{subheadline}</p>
           )}
 
           <div className="mt-6 w-full border-t border-dashed border-muted-foreground/30 pt-6">
@@ -134,6 +152,7 @@ function QuizPage() {
                   rounded="xl"
                   onClick={() => {
                     setAnswer("intro_first", opt.value);
+                    if (variant?.id) trackHeadlineEvent(variant.id, "cta_click");
                     setStep(1);
                   }}
                 >
@@ -481,6 +500,7 @@ function QuizPage() {
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     quizId,
+                    sessionId: getOrCreateSessionId(),
                     name: leadValues["name"],
                     email: leadValues["email"],
                     whatsapp: leadValues["whatsapp"],

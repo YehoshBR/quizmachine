@@ -14,11 +14,19 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as AdminLoginRouteImport } from './routes/admin/login'
+import { Route as ApiTrackSessionRouteImport } from './routes/api/track/session'
+import { Route as ApiTrackHeadlineEventRouteImport } from './routes/api/track/headline-event'
+import { Route as ApiTrackEventRouteImport } from './routes/api/track/event'
 import { Route as ApiAdminUploadRouteImport } from './routes/api/admin/upload'
 import { Route as ApiAdminSeedRouteImport } from './routes/api/admin/seed'
 import { Route as ApiAdminQuizzesRouteImport } from './routes/api/admin/quizzes'
 import { Route as ApiAdminQuizRouteImport } from './routes/api/admin/quiz'
 import { Route as ApiAdminProvisionDomainRouteImport } from './routes/api/admin/provision-domain'
+import { Route as ApiAdminHeadlineVariantsRouteImport } from './routes/api/admin/headline-variants'
+import { Route as ApiAdminHeadlineVariantRouteImport } from './routes/api/admin/headline-variant'
+import { Route as ApiAdminHeadlineStatsRouteImport } from './routes/api/admin/headline-stats'
+import { Route as ApiAdminFunnelStatsRouteImport } from './routes/api/admin/funnel-stats'
+import { Route as ApiAdminExtractSignalsRouteImport } from './routes/api/admin/extract-signals'
 import { Route as AdminQuizzesQuizIdRouteImport } from './routes/admin/quizzes.$quizId'
 
 const OfertaRoute = OfertaRouteImport.update({
@@ -46,6 +54,21 @@ const AdminLoginRoute = AdminLoginRouteImport.update({
   path: '/admin/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTrackSessionRoute = ApiTrackSessionRouteImport.update({
+  id: '/api/track/session',
+  path: '/api/track/session',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTrackHeadlineEventRoute = ApiTrackHeadlineEventRouteImport.update({
+  id: '/api/track/headline-event',
+  path: '/api/track/headline-event',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTrackEventRoute = ApiTrackEventRouteImport.update({
+  id: '/api/track/event',
+  path: '/api/track/event',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminUploadRoute = ApiAdminUploadRouteImport.update({
   id: '/api/admin/upload',
   path: '/api/admin/upload',
@@ -71,6 +94,32 @@ const ApiAdminProvisionDomainRoute = ApiAdminProvisionDomainRouteImport.update({
   path: '/api/admin/provision-domain',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminHeadlineVariantsRoute =
+  ApiAdminHeadlineVariantsRouteImport.update({
+    id: '/api/admin/headline-variants',
+    path: '/api/admin/headline-variants',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminHeadlineVariantRoute = ApiAdminHeadlineVariantRouteImport.update({
+  id: '/api/admin/headline-variant',
+  path: '/api/admin/headline-variant',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminHeadlineStatsRoute = ApiAdminHeadlineStatsRouteImport.update({
+  id: '/api/admin/headline-stats',
+  path: '/api/admin/headline-stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminFunnelStatsRoute = ApiAdminFunnelStatsRouteImport.update({
+  id: '/api/admin/funnel-stats',
+  path: '/api/admin/funnel-stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminExtractSignalsRoute = ApiAdminExtractSignalsRouteImport.update({
+  id: '/api/admin/extract-signals',
+  path: '/api/admin/extract-signals',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminQuizzesQuizIdRoute = AdminQuizzesQuizIdRouteImport.update({
   id: '/admin/quizzes/$quizId',
   path: '/admin/quizzes/$quizId',
@@ -84,11 +133,19 @@ export interface FileRoutesByFullPath {
   '/api/leads': typeof ApiLeadsRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/quizzes/$quizId': typeof AdminQuizzesQuizIdRoute
+  '/api/admin/extract-signals': typeof ApiAdminExtractSignalsRoute
+  '/api/admin/funnel-stats': typeof ApiAdminFunnelStatsRoute
+  '/api/admin/headline-stats': typeof ApiAdminHeadlineStatsRoute
+  '/api/admin/headline-variant': typeof ApiAdminHeadlineVariantRoute
+  '/api/admin/headline-variants': typeof ApiAdminHeadlineVariantsRoute
   '/api/admin/provision-domain': typeof ApiAdminProvisionDomainRoute
   '/api/admin/quiz': typeof ApiAdminQuizRoute
   '/api/admin/quizzes': typeof ApiAdminQuizzesRoute
   '/api/admin/seed': typeof ApiAdminSeedRoute
   '/api/admin/upload': typeof ApiAdminUploadRoute
+  '/api/track/event': typeof ApiTrackEventRoute
+  '/api/track/headline-event': typeof ApiTrackHeadlineEventRoute
+  '/api/track/session': typeof ApiTrackSessionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -97,11 +154,19 @@ export interface FileRoutesByTo {
   '/api/leads': typeof ApiLeadsRoute
   '/admin': typeof AdminIndexRoute
   '/admin/quizzes/$quizId': typeof AdminQuizzesQuizIdRoute
+  '/api/admin/extract-signals': typeof ApiAdminExtractSignalsRoute
+  '/api/admin/funnel-stats': typeof ApiAdminFunnelStatsRoute
+  '/api/admin/headline-stats': typeof ApiAdminHeadlineStatsRoute
+  '/api/admin/headline-variant': typeof ApiAdminHeadlineVariantRoute
+  '/api/admin/headline-variants': typeof ApiAdminHeadlineVariantsRoute
   '/api/admin/provision-domain': typeof ApiAdminProvisionDomainRoute
   '/api/admin/quiz': typeof ApiAdminQuizRoute
   '/api/admin/quizzes': typeof ApiAdminQuizzesRoute
   '/api/admin/seed': typeof ApiAdminSeedRoute
   '/api/admin/upload': typeof ApiAdminUploadRoute
+  '/api/track/event': typeof ApiTrackEventRoute
+  '/api/track/headline-event': typeof ApiTrackHeadlineEventRoute
+  '/api/track/session': typeof ApiTrackSessionRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -111,11 +176,19 @@ export interface FileRoutesById {
   '/api/leads': typeof ApiLeadsRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/quizzes/$quizId': typeof AdminQuizzesQuizIdRoute
+  '/api/admin/extract-signals': typeof ApiAdminExtractSignalsRoute
+  '/api/admin/funnel-stats': typeof ApiAdminFunnelStatsRoute
+  '/api/admin/headline-stats': typeof ApiAdminHeadlineStatsRoute
+  '/api/admin/headline-variant': typeof ApiAdminHeadlineVariantRoute
+  '/api/admin/headline-variants': typeof ApiAdminHeadlineVariantsRoute
   '/api/admin/provision-domain': typeof ApiAdminProvisionDomainRoute
   '/api/admin/quiz': typeof ApiAdminQuizRoute
   '/api/admin/quizzes': typeof ApiAdminQuizzesRoute
   '/api/admin/seed': typeof ApiAdminSeedRoute
   '/api/admin/upload': typeof ApiAdminUploadRoute
+  '/api/track/event': typeof ApiTrackEventRoute
+  '/api/track/headline-event': typeof ApiTrackHeadlineEventRoute
+  '/api/track/session': typeof ApiTrackSessionRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -126,11 +199,19 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/admin/'
     | '/admin/quizzes/$quizId'
+    | '/api/admin/extract-signals'
+    | '/api/admin/funnel-stats'
+    | '/api/admin/headline-stats'
+    | '/api/admin/headline-variant'
+    | '/api/admin/headline-variants'
     | '/api/admin/provision-domain'
     | '/api/admin/quiz'
     | '/api/admin/quizzes'
     | '/api/admin/seed'
     | '/api/admin/upload'
+    | '/api/track/event'
+    | '/api/track/headline-event'
+    | '/api/track/session'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -139,11 +220,19 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/admin'
     | '/admin/quizzes/$quizId'
+    | '/api/admin/extract-signals'
+    | '/api/admin/funnel-stats'
+    | '/api/admin/headline-stats'
+    | '/api/admin/headline-variant'
+    | '/api/admin/headline-variants'
     | '/api/admin/provision-domain'
     | '/api/admin/quiz'
     | '/api/admin/quizzes'
     | '/api/admin/seed'
     | '/api/admin/upload'
+    | '/api/track/event'
+    | '/api/track/headline-event'
+    | '/api/track/session'
   id:
     | '__root__'
     | '/'
@@ -152,11 +241,19 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/admin/'
     | '/admin/quizzes/$quizId'
+    | '/api/admin/extract-signals'
+    | '/api/admin/funnel-stats'
+    | '/api/admin/headline-stats'
+    | '/api/admin/headline-variant'
+    | '/api/admin/headline-variants'
     | '/api/admin/provision-domain'
     | '/api/admin/quiz'
     | '/api/admin/quizzes'
     | '/api/admin/seed'
     | '/api/admin/upload'
+    | '/api/track/event'
+    | '/api/track/headline-event'
+    | '/api/track/session'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -166,11 +263,19 @@ export interface RootRouteChildren {
   ApiLeadsRoute: typeof ApiLeadsRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminQuizzesQuizIdRoute: typeof AdminQuizzesQuizIdRoute
+  ApiAdminExtractSignalsRoute: typeof ApiAdminExtractSignalsRoute
+  ApiAdminFunnelStatsRoute: typeof ApiAdminFunnelStatsRoute
+  ApiAdminHeadlineStatsRoute: typeof ApiAdminHeadlineStatsRoute
+  ApiAdminHeadlineVariantRoute: typeof ApiAdminHeadlineVariantRoute
+  ApiAdminHeadlineVariantsRoute: typeof ApiAdminHeadlineVariantsRoute
   ApiAdminProvisionDomainRoute: typeof ApiAdminProvisionDomainRoute
   ApiAdminQuizRoute: typeof ApiAdminQuizRoute
   ApiAdminQuizzesRoute: typeof ApiAdminQuizzesRoute
   ApiAdminSeedRoute: typeof ApiAdminSeedRoute
   ApiAdminUploadRoute: typeof ApiAdminUploadRoute
+  ApiTrackEventRoute: typeof ApiTrackEventRoute
+  ApiTrackHeadlineEventRoute: typeof ApiTrackHeadlineEventRoute
+  ApiTrackSessionRoute: typeof ApiTrackSessionRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -210,6 +315,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/track/session': {
+      id: '/api/track/session'
+      path: '/api/track/session'
+      fullPath: '/api/track/session'
+      preLoaderRoute: typeof ApiTrackSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/track/headline-event': {
+      id: '/api/track/headline-event'
+      path: '/api/track/headline-event'
+      fullPath: '/api/track/headline-event'
+      preLoaderRoute: typeof ApiTrackHeadlineEventRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/track/event': {
+      id: '/api/track/event'
+      path: '/api/track/event'
+      fullPath: '/api/track/event'
+      preLoaderRoute: typeof ApiTrackEventRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/upload': {
       id: '/api/admin/upload'
       path: '/api/admin/upload'
@@ -245,6 +371,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminProvisionDomainRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/headline-variants': {
+      id: '/api/admin/headline-variants'
+      path: '/api/admin/headline-variants'
+      fullPath: '/api/admin/headline-variants'
+      preLoaderRoute: typeof ApiAdminHeadlineVariantsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/headline-variant': {
+      id: '/api/admin/headline-variant'
+      path: '/api/admin/headline-variant'
+      fullPath: '/api/admin/headline-variant'
+      preLoaderRoute: typeof ApiAdminHeadlineVariantRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/headline-stats': {
+      id: '/api/admin/headline-stats'
+      path: '/api/admin/headline-stats'
+      fullPath: '/api/admin/headline-stats'
+      preLoaderRoute: typeof ApiAdminHeadlineStatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/funnel-stats': {
+      id: '/api/admin/funnel-stats'
+      path: '/api/admin/funnel-stats'
+      fullPath: '/api/admin/funnel-stats'
+      preLoaderRoute: typeof ApiAdminFunnelStatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/extract-signals': {
+      id: '/api/admin/extract-signals'
+      path: '/api/admin/extract-signals'
+      fullPath: '/api/admin/extract-signals'
+      preLoaderRoute: typeof ApiAdminExtractSignalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/quizzes/$quizId': {
       id: '/admin/quizzes/$quizId'
       path: '/admin/quizzes/$quizId'
@@ -262,11 +423,19 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLeadsRoute: ApiLeadsRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminQuizzesQuizIdRoute: AdminQuizzesQuizIdRoute,
+  ApiAdminExtractSignalsRoute: ApiAdminExtractSignalsRoute,
+  ApiAdminFunnelStatsRoute: ApiAdminFunnelStatsRoute,
+  ApiAdminHeadlineStatsRoute: ApiAdminHeadlineStatsRoute,
+  ApiAdminHeadlineVariantRoute: ApiAdminHeadlineVariantRoute,
+  ApiAdminHeadlineVariantsRoute: ApiAdminHeadlineVariantsRoute,
   ApiAdminProvisionDomainRoute: ApiAdminProvisionDomainRoute,
   ApiAdminQuizRoute: ApiAdminQuizRoute,
   ApiAdminQuizzesRoute: ApiAdminQuizzesRoute,
   ApiAdminSeedRoute: ApiAdminSeedRoute,
   ApiAdminUploadRoute: ApiAdminUploadRoute,
+  ApiTrackEventRoute: ApiTrackEventRoute,
+  ApiTrackHeadlineEventRoute: ApiTrackHeadlineEventRoute,
+  ApiTrackSessionRoute: ApiTrackSessionRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

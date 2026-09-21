@@ -18,6 +18,9 @@ const TIER_OPTIONS: { value: "curto" | "medio" | "longo"; label: string }[] = [
 ];
 
 type SignalRow = { key: string; label: string; kind: "pain" | "desire"; headline: string; body: string };
+type HeadlineVariantRow = { id: string; label: string; headline: string; subheadline: string | null; is_paused: boolean };
+type HeadlineStatRow = { variant: HeadlineVariantRow; views: number; ctaClicks: number; leads: number; checkoutClicks: number };
+type FunnelRow = { stepIndex: number; screenId: string; type: string; label: string; reached: number; dropoffPct: number | null };
 
 function slugify(s: string): string {
   return s
@@ -76,6 +79,11 @@ function EditQuizPage() {
   const [primaryColor, setPrimaryColor] = useState(quiz.quiz_meta.primaryColor ?? "");
   const [secondaryColor, setSecondaryColor] = useState(quiz.quiz_meta.secondaryColor ?? "");
 
+  // Rastreamento e integrações
+  const [facebookPixelId, setFacebookPixelId] = useState(quiz.quiz_meta.facebookPixelId ?? "");
+  const [leadWebhookUrl, setLeadWebhookUrl] = useState(quiz.quiz_meta.leadWebhookUrl ?? "");
+  const [customHeadScript, setCustomHeadScript] = useState(quiz.quiz_meta.customHeadScript ?? "");
+
   // Biblioteca de sinais (dores/desejos) — formulário em vez de JSON cru.
   const [signals, setSignals] = useState<SignalRow[]>(() => {
     const lib = (quiz.quiz_meta.signalLibrary ?? {}) as Record<string, Omit<SignalRow, "key">>;
@@ -89,6 +97,7 @@ function EditQuizPage() {
       product: _p, backgroundMode: _bg, primaryColor: _pc, secondaryColor: _sc,
       signalLibrary: _sl, title: _t, description: _d, logo: _lg, logoAlt: _la,
       expertName: _en, expertImage: _ei, offerUrl: _ou,
+      facebookPixelId: _fpid, leadWebhookUrl: _lwu, customHeadScript: _chs,
       ...rest
     } = quiz.quiz_meta as unknown as Record<string, unknown>;
     return JSON.stringify(rest, null, 2);
@@ -103,12 +112,61 @@ function EditQuizPage() {
   const [media, setMedia] = useState<{ url: string; filename: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const screensFileInputRef = useRef<HTMLInputElement>(null);
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
+  const expertImageFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Extração automática de dores/desejos pela narrativa
+  const [extracting, setExtracting] = useState(false);
+
+  // Teste A/B de headline
+  const [headlineStats, setHeadlineStats] = useState<HeadlineStatRow[]>([]);
+  const [loadingHeadlines, setLoadingHeadlines] = useState(false);
+  const [newVariantLabel, setNewVariantLabel] = useState("");
+  const [newVariantHeadline, setNewVariantHeadline] = useState("");
+  const [newVariantSubheadline, setNewVariantSubheadline] = useState("");
+  const [savingVariant, setSavingVariant] = useState(false);
+
+  // Abandono por tela
+  const [funnelRows, setFunnelRows] = useState<FunnelRow[]>([]);
+  const [loadingFunnel, setLoadingFunnel] = useState(false);
 
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), toast.kind === "success" ? 4000 : 9000);
     return () => clearTimeout(t);
   }, [toast]);
+
+  async function loadHeadlineStats() {
+    setLoadingHeadlines(true);
+    try {
+      const res = await fetch(`/api/admin/headline-stats?quizId=${quizId}`);
+      const json = await res.json();
+      if (json.ok) setHeadlineStats(json.stats);
+    } catch {
+      /* silencioso — não é crítico pro resto da página */
+    } finally {
+      setLoadingHeadlines(false);
+    }
+  }
+
+  async function loadFunnelStats() {
+    setLoadingFunnel(true);
+    try {
+      const res = await fetch(`/api/admin/funnel-stats?quizId=${quizId}`);
+      const json = await res.json();
+      if (json.ok) setFunnelRows(json.rows);
+    } catch {
+      /* silencioso */
+    } finally {
+      setLoadingFunnel(false);
+    }
+  }
+
+  useEffect(() => {
+    loadHeadlineStats();
+    loadFunnelStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function addSignal() {
     setSignals((s) => [...s, { key: "", label: "", kind: "pain", headline: "", body: "" }]);
@@ -182,6 +240,11 @@ function EditQuizPage() {
     } else {
       delete quizMetaParsed.signalLibrary;
     }
+
+    // Rastreamento e integrações
+    if (facebookPixelId.trim()) quizMetaParsed.facebookPixelId = facebookPixelId.trim(); else delete quizMetaParsed.facebookPixelId;
+    if (leadWebhookUrl.trim()) quizMetaParsed.leadWebhookUrl = leadWebhookUrl.trim(); else delete quizMetaParsed.leadWebhookUrl;
+    if (customHeadScript.trim()) quizMetaParsed.customHeadScript = customHeadScript; else delete quizMetaParsed.customHeadScript;
 
     setSaving(true);
     try {
@@ -262,6 +325,139 @@ function EditQuizPage() {
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  /** Upload direto pra um campo específico (logo, foto do especialista) — sem passar pela galeria. */
+  async function uploadAndSet(file: File, setter: (url: string) => void, fieldLabel: string) {
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("quizId", quizId);
+      const res = await fetch("/api/admin/upload", { method: "POST", body: form });
+      const json = await res.json();
+      if (json.ok) {
+        setter(json.url);
+        setMedia((m) => [{ url: json.url, filename: json.filename }, ...m]);
+        setToast({ kind: "success", text: `${fieldLabel} atualizado(a).` });
+      } else {
+        setToast({ kind: "error", text: json.error ?? "Falha no upload." });
+      }
+    } catch {
+      setToast({ kind: "error", text: "Falha no upload (rede)." });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  /** Lê a narrativa das telas e sugere a biblioteca de dores/desejos + marca as opções — via IA. */
+  async function handleExtractSignals() {
+    setToast(null);
+    let screensParsed: unknown;
+    try {
+      screensParsed = JSON.parse(screensText);
+    } catch (e) {
+      setToast({ kind: "error", text: `Corrija o JSON de "Telas do quiz" antes de gerar automaticamente: ${(e as Error).message}` });
+      return;
+    }
+    if (!Array.isArray(screensParsed)) {
+      setToast({ kind: "error", text: `"Telas do quiz" precisa ser uma lista de telas antes de gerar automaticamente.` });
+      return;
+    }
+    setExtracting(true);
+    try {
+      const res = await fetch("/api/admin/extract-signals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ screens: screensParsed, product: { name: productName, promise: productPromise } }),
+      });
+      const json = await res.json();
+      if (!json.ok) {
+        setToast({ kind: "error", text: json.error ?? "Falha ao gerar automaticamente." });
+        return;
+      }
+      const lib = json.signalLibrary as Record<string, { kind: "pain" | "desire"; label: string; headline: string; body: string }>;
+      setSignals(Object.entries(lib).map(([key, def]) => ({ key, ...def })));
+
+      const tags = (json.tags ?? {}) as Record<string, Record<string, string[]>>;
+      const tagged = (screensParsed as Record<string, unknown>[]).map((s) => {
+        const screenId = s.id as string;
+        const screenTags = tags[screenId];
+        if (!screenTags) return s;
+        const applyTags = (opts: unknown) =>
+          Array.isArray(opts)
+            ? (opts as Record<string, unknown>[]).map((o) =>
+                screenTags[o.value as string] ? { ...o, signals: screenTags[o.value as string] } : o
+              )
+            : opts;
+        const patch: Record<string, unknown> = {};
+        if (Array.isArray(s.options)) patch.options = applyTags(s.options);
+        if (Array.isArray(s.firstOptions)) patch.firstOptions = applyTags(s.firstOptions);
+        return Object.keys(patch).length ? { ...s, ...patch } : s;
+      });
+      setScreensText(JSON.stringify(tagged, null, 2));
+      setToast({
+        kind: "success",
+        text: `Gerado: ${Object.keys(lib).length} sinal(is) identificado(s) e opções marcadas nas telas. Confira embaixo antes de salvar.`,
+      });
+    } catch (e) {
+      setToast({ kind: "error", text: `Falha de rede: ${(e as Error).message}` });
+    } finally {
+      setExtracting(false);
+    }
+  }
+
+  async function handleAddVariant() {
+    if (!newVariantHeadline.trim()) return;
+    setSavingVariant(true);
+    try {
+      const res = await fetch("/api/admin/headline-variants", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quizId,
+          label: newVariantLabel.trim(),
+          headline: newVariantHeadline.trim(),
+          subheadline: newVariantSubheadline.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setNewVariantLabel("");
+        setNewVariantHeadline("");
+        setNewVariantSubheadline("");
+        setToast({ kind: "success", text: "Variante criada — já entra no sorteio dos próximos visitantes." });
+        loadHeadlineStats();
+      } else {
+        setToast({ kind: "error", text: json.error ?? "Falha ao criar variante." });
+      }
+    } catch (e) {
+      setToast({ kind: "error", text: `Falha de rede: ${(e as Error).message}` });
+    } finally {
+      setSavingVariant(false);
+    }
+  }
+
+  async function toggleVariantPause(id: string, isPaused: boolean) {
+    try {
+      await fetch(`/api/admin/headline-variant?id=${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPaused }),
+      });
+      loadHeadlineStats();
+    } catch {
+      setToast({ kind: "error", text: "Falha ao atualizar variante." });
+    }
+  }
+
+  async function deleteVariant(id: string) {
+    try {
+      await fetch(`/api/admin/headline-variant?id=${id}`, { method: "DELETE" });
+      loadHeadlineStats();
+    } catch {
+      setToast({ kind: "error", text: "Falha ao remover variante." });
     }
   }
 
@@ -774,7 +970,23 @@ function EditQuizPage() {
             </div>
             <div>
               <Label>URL do logo</Label>
-              <Input value={logo} onChange={(e) => setLogo(e.target.value)} placeholder="/uploads/... (envie na seção Imagens)" className="mt-1" />
+              <div className="mt-1 flex gap-2">
+                <Input value={logo} onChange={(e) => setLogo(e.target.value)} placeholder="/uploads/..." />
+                <input
+                  ref={logoFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void uploadAndSet(file, setLogo, "Logo");
+                    if (logoFileInputRef.current) logoFileInputRef.current.value = "";
+                  }}
+                />
+                <Button type="button" variant="outline" disabled={uploading} onClick={() => logoFileInputRef.current?.click()} className="shrink-0">
+                  📤 Enviar
+                </Button>
+              </div>
             </div>
             <div>
               <Label>Texto alternativo do logo</Label>
@@ -786,7 +998,23 @@ function EditQuizPage() {
             </div>
             <div>
               <Label>Foto do especialista — URL (opcional)</Label>
-              <Input value={expertImage} onChange={(e) => setExpertImage(e.target.value)} className="mt-1" />
+              <div className="mt-1 flex gap-2">
+                <Input value={expertImage} onChange={(e) => setExpertImage(e.target.value)} />
+                <input
+                  ref={expertImageFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void uploadAndSet(file, setExpertImage, "Foto do especialista");
+                    if (expertImageFileInputRef.current) expertImageFileInputRef.current.value = "";
+                  }}
+                />
+                <Button type="button" variant="outline" disabled={uploading} onClick={() => expertImageFileInputRef.current?.click()} className="shrink-0">
+                  📤 Enviar
+                </Button>
+              </div>
             </div>
             <div className="sm:col-span-2">
               <Label>Rota da página de oferta</Label>
@@ -939,6 +1167,13 @@ function EditQuizPage() {
             A oferta soma quantas vezes cada código apareceu e mostra a dor + o desejo mais fortes.
             Deixe a lista vazia se não quiser personalização — a oferta mostra o produto de forma genérica.
           </p>
+          <Button type="button" variant="outline" onClick={handleExtractSignals} disabled={extracting} className="mt-3">
+            {extracting ? "Analisando as telas..." : "✨ Gerar automaticamente pela narrativa"}
+          </Button>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Lê as telas do quiz (carregadas lá embaixo) e sugere a biblioteca inteira + marca as
+            opções sozinho. Substitui a lista abaixo — confira antes de salvar.
+          </p>
           <div className="mt-4 space-y-4">
             {signals.map((s, i) => (
               <div key={i} className="rounded-xl border border-border p-4">
@@ -1036,6 +1271,176 @@ function EditQuizPage() {
             spellCheck={false}
             className="mt-3 h-[32rem] w-full rounded-lg border border-input bg-background p-3 font-mono text-xs"
           />
+        </section>
+
+        {/* ---------- Teste A/B de headline ---------- */}
+        <section className="rounded-2xl border border-border bg-card p-6">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-base font-bold text-foreground">Teste de headline (A/B)</h2>
+            <Button type="button" size="sm" variant="outline" onClick={loadHeadlineStats} disabled={loadingHeadlines}>
+              {loadingHeadlines ? "Atualizando..." : "↻ Atualizar"}
+            </Button>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Cadastre 2 ou mais variantes de headline pra tela de abertura. Cada visitante novo recebe
+            uma sorteada; o sistema conta visualizações, cliques, leads e cliques no checkout de cada
+            uma — e a otimização automática (roda 1x por dia) pausa sozinha as que estiverem perdendo
+            feio e propõe headlines novas com IA quando houver dado suficiente. Sem nenhuma variante
+            cadastrada, todo mundo vê o headline fixo da tela intro.
+          </p>
+
+          {headlineStats.length > 0 && (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[640px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border text-xs uppercase text-muted-foreground">
+                    <th className="py-2 pr-3">Variante</th>
+                    <th className="py-2 pr-3">Views</th>
+                    <th className="py-2 pr-3">Cliques</th>
+                    <th className="py-2 pr-3">CTR</th>
+                    <th className="py-2 pr-3">Leads</th>
+                    <th className="py-2 pr-3">Checkout</th>
+                    <th className="py-2 pr-3">Status</th>
+                    <th className="py-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {headlineStats.map(({ variant, views, ctaClicks, leads, checkoutClicks }) => (
+                    <tr key={variant.id} className="border-b border-border/60 align-top">
+                      <td className="py-2 pr-3">
+                        <p className="font-semibold text-foreground">{variant.label}</p>
+                        <p className="max-w-xs text-xs text-muted-foreground">{variant.headline}</p>
+                      </td>
+                      <td className="py-2 pr-3">{views}</td>
+                      <td className="py-2 pr-3">{ctaClicks}</td>
+                      <td className="py-2 pr-3">{views > 0 ? `${Math.round((ctaClicks / views) * 1000) / 10}%` : "—"}</td>
+                      <td className="py-2 pr-3">{leads}</td>
+                      <td className="py-2 pr-3">{checkoutClicks}</td>
+                      <td className="py-2 pr-3">
+                        {variant.is_paused ? (
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">Pausada</span>
+                        ) : (
+                          <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-semibold text-emerald-600">Ativa</span>
+                        )}
+                      </td>
+                      <td className="space-x-2 py-2 text-right">
+                        <Button type="button" size="sm" variant="ghost" onClick={() => toggleVariantPause(variant.id, !variant.is_paused)}>
+                          {variant.is_paused ? "Reativar" : "Pausar"}
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => deleteVariant(variant.id)}>
+                          Remover
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="mt-5 rounded-xl border border-dashed border-border p-4">
+            <p className="text-sm font-semibold text-foreground">+ Nova variante</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label>Rótulo (só pra você identificar)</Label>
+                <Input value={newVariantLabel} onChange={(e) => setNewVariantLabel(e.target.value)} placeholder="Ex: Variante urgência" className="mt-1" />
+              </div>
+              <div>
+                <Label>Headline</Label>
+                <Input value={newVariantHeadline} onChange={(e) => setNewVariantHeadline(e.target.value)} className="mt-1" />
+              </div>
+              <div className="sm:col-span-2">
+                <Label>Subheadline (opcional)</Label>
+                <Input value={newVariantSubheadline} onChange={(e) => setNewVariantSubheadline(e.target.value)} className="mt-1" />
+              </div>
+            </div>
+            <Button type="button" onClick={handleAddVariant} disabled={savingVariant || !newVariantHeadline.trim()} className="mt-3">
+              {savingVariant ? "Criando..." : "+ Adicionar variante"}
+            </Button>
+          </div>
+        </section>
+
+        {/* ---------- Abandono por tela ---------- */}
+        <section className="rounded-2xl border border-border bg-card p-6">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-base font-bold text-foreground">Abandono por tela</h2>
+            <Button type="button" size="sm" variant="outline" onClick={loadFunnelStats} disabled={loadingFunnel}>
+              {loadingFunnel ? "Atualizando..." : "↻ Atualizar"}
+            </Button>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Quantas sessões chegaram em cada tela e quanto % caiu antes da próxima — pra achar a tela
+            que está travando o funil. Só aparece dado depois que o quiz recebe visitas reais.
+          </p>
+          {funnelRows.length === 0 ? (
+            <p className="mt-4 text-sm text-muted-foreground">
+              {loadingFunnel ? "Carregando..." : "Ainda sem dados de visitas registradas."}
+            </p>
+          ) : (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[560px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border text-xs uppercase text-muted-foreground">
+                    <th className="py-2 pr-3">#</th>
+                    <th className="py-2 pr-3">Tela</th>
+                    <th className="py-2 pr-3">Tipo</th>
+                    <th className="py-2 pr-3">Alcançou</th>
+                    <th className="py-2 pr-3">Abandono até a próxima</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {funnelRows.map((r) => (
+                    <tr key={r.screenId} className="border-b border-border/60">
+                      <td className="py-2 pr-3 text-muted-foreground">{r.stepIndex}</td>
+                      <td className="max-w-xs truncate py-2 pr-3 font-medium text-foreground">{r.label || r.screenId}</td>
+                      <td className="py-2 pr-3 text-muted-foreground">{r.type}</td>
+                      <td className="py-2 pr-3">{r.reached}</td>
+                      <td className="py-2 pr-3">
+                        {r.dropoffPct == null ? (
+                          "—"
+                        ) : (
+                          <span className={r.dropoffPct >= 30 ? "font-bold text-destructive" : r.dropoffPct >= 15 ? "font-semibold text-amber-600" : "text-muted-foreground"}>
+                            {r.dropoffPct >= 30 ? "⚠️ " : ""}
+                            {r.dropoffPct}%
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        {/* ---------- Rastreamento e integrações ---------- */}
+        <section className="rounded-2xl border border-border bg-card p-6">
+          <h2 className="text-base font-bold text-foreground">Rastreamento e integrações</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Tudo opcional. O pixel e o script vão em toda página pública do quiz (intro, perguntas e
+            oferta); o webhook é chamado toda vez que um lead é capturado.
+          </p>
+          <div className="mt-4 grid gap-4">
+            <div>
+              <Label>Facebook Pixel ID</Label>
+              <Input value={facebookPixelId} onChange={(e) => setFacebookPixelId(e.target.value)} placeholder="123456789012345" className="mt-1" />
+            </div>
+            <div>
+              <Label>Webhook de leads (POST em JSON a cada lead capturado)</Label>
+              <Input value={leadWebhookUrl} onChange={(e) => setLeadWebhookUrl(e.target.value)} placeholder="https://hooks.zapier.com/..." className="mt-1" />
+            </div>
+            <div>
+              <Label>Script personalizado no &lt;head&gt; (GTM, TikTok Pixel, Google Ads...)</Label>
+              <textarea
+                value={customHeadScript}
+                onChange={(e) => setCustomHeadScript(e.target.value)}
+                rows={4}
+                spellCheck={false}
+                placeholder="Cole só o conteúdo JavaScript do script (sem as tags <script>...</script>)"
+                className="mt-1 w-full rounded-lg border border-input bg-background p-3 font-mono text-xs"
+              />
+            </div>
+          </div>
         </section>
 
         {/* ---------- Avançado ---------- */}

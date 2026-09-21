@@ -38,6 +38,12 @@ export interface QuizMeta {
    * fortes. Sem isso configurado, a oferta cai pro conteúdo genérico do produto.
    */
   signalLibrary?: Record<string, SignalDef>;
+  /** Facebook Pixel ID (só o número/ID) — injeta o script padrão + PageView em toda página pública. */
+  facebookPixelId?: string;
+  /** URL que recebe um POST JSON com os dados do lead assim que ele é capturado (Zapier, Make, CRM...). */
+  leadWebhookUrl?: string;
+  /** HTML/script cru injetado no <head> das páginas públicas (GTM, TikTok Pixel, Google Ads, etc). */
+  customHeadScript?: string;
 }
 
 export interface ProductInfo {
