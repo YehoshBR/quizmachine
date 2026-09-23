@@ -535,7 +535,7 @@ function QuizPage() {
             <Button
               type="submit"
               disabled={!valid || submitting}
-              className="h-14 w-full text-base font-bold"
+              className="min-h-14 w-full whitespace-normal text-balance px-4 py-3 text-base font-bold leading-tight"
             >
               {submitting ? "ENVIANDO..." : (screen.ctaText ?? "CONTINUAR →")}
             </Button>
