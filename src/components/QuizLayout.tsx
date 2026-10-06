@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
-import { quizMeta } from "@/lib/quiz-config";
+import { useRouterState } from "@tanstack/react-router";
+import { quizMeta as fallbackQuizMeta } from "@/lib/quiz-config";
 import { cn } from "@/lib/utils";
 
 interface QuizLayoutProps {
@@ -10,6 +11,16 @@ interface QuizLayoutProps {
 }
 
 export function QuizLayout({ progress, onBack, children, className }: QuizLayoutProps) {
+  // Logo do quiz do domínio atual (multi-tenant), vindo do loader da rota "/".
+  // Sem isso, todo quiz mostrava o logo estático do quiz-config.ts.
+  const tenantMeta = useRouterState({
+    select: (s) =>
+      (s.matches.find((m) => m.routeId === "/")?.loaderData as
+        | { quizMeta?: { logo?: string; logoAlt?: string } }
+        | undefined)?.quizMeta,
+  });
+  const logo = (tenantMeta?.logo ?? fallbackQuizMeta.logo) as string;
+  const logoAlt = tenantMeta?.logoAlt ?? fallbackQuizMeta.logoAlt;
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur">
@@ -25,8 +36,8 @@ export function QuizLayout({ progress, onBack, children, className }: QuizLayout
           )}
           <span className="rounded-lg bg-black px-2.5 py-1.5">
             <img
-              src={quizMeta.logo as string}
-              alt={quizMeta.logoAlt}
+              src={logo}
+              alt={logoAlt}
               className="block h-7 w-auto"
               onError={(e) => { (e.target as HTMLImageElement).src = "/logo.svg"; }}
             />
