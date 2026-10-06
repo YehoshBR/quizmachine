@@ -47,6 +47,19 @@ function resolveOfferPath(quizMeta: QuizMeta, answers: Answers): string {
   return offerPath;
 }
 
+/**
+ * Vai pra oferta. Rota interna simples usa o router; URL externa (http...) ou rota com
+ * query (ex.: "/oferta?plano=direcao") vai por navegação completa — o router tipado não
+ * aceita query embutida na string. As respostas já estão no sessionStorage antes disso.
+ */
+function goToOffer(navigate: (opts: { to: "/" }) => unknown, path: string) {
+  if (/^https?:\/\//i.test(path) || path.includes("?")) {
+    window.location.assign(path);
+    return;
+  }
+  navigate({ to: path as "/" });
+}
+
 // =================== MAIN QUIZ PAGE ===================
 function QuizPage() {
   const navigate = useNavigate();
@@ -102,7 +115,7 @@ function QuizPage() {
         clearInterval(i);
         setTimeout(() => {
           persistAnswers(answers);
-          navigate({ to: resolveOfferPath(quizMeta, answers) as "/" });
+          goToOffer(navigate as never, resolveOfferPath(quizMeta, answers));
         }, 300);
       }
     }, 60);
@@ -118,7 +131,7 @@ function QuizPage() {
       <AnalyzingScreen
         glyphs={loadingScreen?.glyphs}
         expertName={quizMeta.expertName}
-        onDone={() => navigate({ to: resolveOfferPath(quizMeta, answers) as "/" })}
+        onDone={() => goToOffer(navigate as never, resolveOfferPath(quizMeta, answers))}
       />
     );
   }

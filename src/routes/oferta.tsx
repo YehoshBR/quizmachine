@@ -47,10 +47,15 @@ function getCookie(name: string): string | null {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
-function buildCheckoutUrl(base: string): string {
+function buildCheckoutUrl(base: string, leadName?: string): string {
+  // {nome} → primeiro nome do lead (ou vazio). Vale pra checkout e pra link de conversa.
+  const firstName = (leadName ?? "").trim().split(/\s+/)[0] ?? "";
+  base = base.split("{nome}").join(encodeURIComponent(firstName));
   if (typeof window === "undefined") return base;
   try {
     const url = new URL(base);
+    // Link de WhatsApp não recebe UTM/fbclid (vira lixo no texto da conversa).
+    if (/(^|\.)wa\.me$|whatsapp\.com$/i.test(url.hostname)) return url.toString();
     const current = new URLSearchParams(window.location.search);
     ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"].forEach((k) => {
       const v = current.get(k) || sessionStorage.getItem(k);
@@ -84,13 +89,22 @@ function useCountdown(totalSeconds: number) {
 
 function OfertaPage() {
   const { id: quizId, quizMeta, screens } = Route.useLoaderData();
-  const product = quizMeta.product;
+  const highTicket = quizMeta.offerStyle === "high-ticket";
+  // ?plano=<chave> abre uma oferta alternativa (ex.: downsell), definida em quizMeta.altProducts.
+  const [planKey, setPlanKey] = useState<string | null>(null);
+  const [leadName, setLeadName] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    setPlanKey(new URLSearchParams(window.location.search).get("plano"));
+  }, []);
+  const product = (planKey && quizMeta.altProducts?.[planKey]) || quizMeta.product;
   const countdown = useCountdown(20 * 60);
+  const ctaLabel = quizMeta.offerCtaLabel ?? (highTicket ? "Quero conversar sobre a minha vaga →" : "");
 
   const [signals, setSignals] = useState<ReturnType<typeof computeTopSignals> | null>(null);
   useEffect(() => {
     const answers = readPersistedAnswers();
     if (!answers) return;
+    if (typeof answers["name"] === "string") setLeadName(answers["name"] as string);
     setSignals(computeTopSignals(screens, answers, quizMeta.signalLibrary));
   }, [screens, quizMeta.signalLibrary]);
 
@@ -101,7 +115,7 @@ function OfertaPage() {
 
   const topPain = signals?.topPain;
   const topDesire = signals?.topDesire;
-  const checkoutUrl = product ? buildCheckoutUrl(product.checkoutUrl) : "#";
+  const checkoutUrl = product ? buildCheckoutUrl(product.checkoutUrl, leadName) : "#";
 
   const headline = topPain?.headline ?? (product ? `A hora de resolver isso é agora: *${product.name}*` : "Sua oferta personalizada");
   const subheadline = topPain?.body ?? product?.promise ?? "Configure quizMeta.product no painel pra ativar essa página.";
@@ -113,7 +127,7 @@ function OfertaPage() {
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Barra de urgência */}
-      {!countdown.done && (
+      {!highTicket && !countdown.done && (
         <div className="sticky top-0 z-40 bg-destructive py-2 text-center text-xs font-bold uppercase tracking-wider text-destructive-foreground">
           ⏱ {countdown.label} · Condição especial desta sessão
         </div>
@@ -138,7 +152,7 @@ function OfertaPage() {
             {subheadline}
           </p>
           <Button onClick={trackCheckout} asChild className="mt-8 h-14 px-10 text-base font-bold uppercase tracking-wide">
-            <a href={checkoutUrl}>Quero resolver isso agora →</a>
+            <a href={checkoutUrl}>{ctaLabel || "Quero resolver isso agora →"}</a>
           </Button>
         </div>
       </section>
@@ -206,7 +220,7 @@ function OfertaPage() {
         <div className="mx-auto max-w-md">
           <div className="relative flex flex-col rounded-2xl border-2 border-primary bg-card p-7 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)]">
             <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1 text-xs font-bold uppercase tracking-wider text-primary-foreground">
-              Acesso imediato
+              {quizMeta.offerBadge ?? (highTicket ? "Vagas por turma" : "Acesso imediato")}
             </span>
             {product ? (
               <>
@@ -226,7 +240,7 @@ function OfertaPage() {
                   ))}
                 </ul>
                 <Button onClick={trackCheckout} asChild className="mt-7 h-14 w-full text-base font-bold uppercase">
-                  <a href={checkoutUrl}>Quero garantir minha vaga →</a>
+                  <a href={checkoutUrl}>{ctaLabel || "Quero garantir minha vaga →"}</a>
                 </Button>
                 {product.guarantee && (
                   <p className="mt-3 text-center text-xs text-muted-foreground">🔒 {product.guarantee}</p>
@@ -251,11 +265,11 @@ function OfertaPage() {
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 px-4 py-3 backdrop-blur">
           <div className="mx-auto flex max-w-md items-center gap-3">
             <div className="flex flex-col leading-none">
-              <span className="text-[10px] uppercase text-muted-foreground">Por apenas</span>
+              <span className="text-[10px] uppercase text-muted-foreground">{highTicket ? "Investimento" : "Por apenas"}</span>
               <span className="text-lg font-extrabold text-primary">{product.price}</span>
             </div>
             <Button onClick={trackCheckout} asChild className="ml-auto h-11 flex-1 font-bold">
-              <a href={checkoutUrl}>Garantir agora →</a>
+              <a href={checkoutUrl}>{highTicket ? "Conversar agora →" : "Garantir agora →"}</a>
             </Button>
           </div>
         </div>

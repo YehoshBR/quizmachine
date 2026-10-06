@@ -44,6 +44,22 @@ export interface QuizMeta {
   leadWebhookUrl?: string;
   /** HTML/script cru injetado no <head> das páginas públicas (GTM, TikTok Pixel, Google Ads, etc). */
   customHeadScript?: string;
+  /**
+   * Estilo da /oferta. "low-ticket" (padrão): contador de 20 min, "Por apenas", acesso imediato.
+   * "high-ticket": sem contador nem urgência artificial, textos de conversa/aplicação — pra
+   * mentorias e ofertas que fecham numa conversa (ex.: WhatsApp).
+   */
+  offerStyle?: "low-ticket" | "high-ticket";
+  /** Texto dos botões de CTA da /oferta (ex.: "Quero conversar com o Joe"). Padrão depende do offerStyle. */
+  offerCtaLabel?: string;
+  /** Selo acima do card de preço (ex.: "Turma em formação"). Padrão depende do offerStyle. */
+  offerBadge?: string;
+  /**
+   * Ofertas alternativas, abertas por `/oferta?plano=<chave>` (ex.: um downsell pra quem disse
+   * que o investimento não cabe agora). Use junto com `offerRouteByAnswer` apontando a resposta
+   * pra "/oferta?plano=<chave>". Mesmo formato de `product`.
+   */
+  altProducts?: Record<string, ProductInfo>;
 }
 
 export interface ProductInfo {
@@ -53,6 +69,10 @@ export interface ProductInfo {
   price: string;
   installments?: string;
   originalPrice?: string;
+  /**
+   * Link do checkout — ou de conversa (ex.: https://wa.me/55...?text=...). Aceita o marcador
+   * `{nome}`, trocado pelo primeiro nome que o lead digitou no formulário.
+   */
   checkoutUrl: string;
   /** Lista de benefícios/entregáveis — vira a lista "o que você recebe" na oferta. */
   benefits: string[];
