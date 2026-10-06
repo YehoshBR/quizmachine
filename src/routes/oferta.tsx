@@ -50,7 +50,8 @@ function getCookie(name: string): string | null {
 function buildCheckoutUrl(base: string, leadName?: string): string {
   // {nome} → primeiro nome do lead (ou vazio). Vale pra checkout e pra link de conversa.
   const firstName = (leadName ?? "").trim().split(/\s+/)[0] ?? "";
-  base = base.split("{nome}").join(encodeURIComponent(firstName));
+  const nomeCodificado = encodeURIComponent(firstName);
+  base = base.split("{nome}").join(nomeCodificado).split("%7Bnome%7D").join(nomeCodificado).split("%7bnome%7d").join(nomeCodificado);
   if (typeof window === "undefined") return base;
   try {
     const url = new URL(base);
