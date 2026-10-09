@@ -216,6 +216,38 @@ function OfertaPage() {
         </section>
       )}
 
+      {/* ANCORAGEM — compara com outra oferta da esteira antes do preço */}
+      {product?.anchor && (
+        <section className="px-5 pt-14">
+          <div className="mx-auto max-w-md">
+            <h2 className="text-center text-xl font-extrabold uppercase text-foreground sm:text-2xl">
+              {product.anchor.title}
+            </h2>
+            <div className="mt-6 space-y-3">
+              {product.anchor.items.map((it) => (
+                <div
+                  key={it.label}
+                  className={`flex items-center justify-between gap-4 rounded-xl border p-4 ${
+                    it.highlight ? "border-2 border-primary bg-card" : "border-border bg-card/40"
+                  }`}
+                >
+                  <div>
+                    <p className={`text-sm font-bold ${it.highlight ? "text-primary" : "text-foreground"}`}>{it.label}</p>
+                    {it.desc && <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{it.desc}</p>}
+                  </div>
+                  <p className={`shrink-0 text-lg font-extrabold ${it.highlight ? "text-primary" : "text-muted-foreground"}`}>
+                    {it.price}
+                  </p>
+                </div>
+              ))}
+            </div>
+            {product.anchor.note && (
+              <p className="mt-5 text-center text-sm leading-relaxed text-foreground">{product.anchor.note}</p>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* PREÇO + CTA */}
       <section id="oferta" className="px-5 py-14">
         <div className="mx-auto max-w-md">

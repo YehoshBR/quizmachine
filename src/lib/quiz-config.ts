@@ -77,6 +77,15 @@ export interface ProductInfo {
   /** Lista de benefícios/entregáveis — vira a lista "o que você recebe" na oferta. */
   benefits: string[];
   guarantee?: string;
+  /**
+   * Ancoragem de preço: compara a oferta com outra(s) da esteira antes do card de preço
+   * (ex.: "uma call avulsa custa R$1.500"). O item com `highlight` é a oferta atual.
+   */
+  anchor?: {
+    title: string;
+    items: { label: string; desc?: string; price: string; highlight?: boolean }[];
+    note?: string;
+  };
 }
 
 export type SignalDef = {
