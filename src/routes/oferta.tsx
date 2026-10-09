@@ -302,7 +302,7 @@ function OfertaPage() {
               <span className="text-lg font-extrabold text-primary">{product.price}</span>
             </div>
             <Button onClick={trackCheckout} asChild className="ml-auto h-11 flex-1 font-bold">
-              <a href={checkoutUrl}>{highTicket ? "Conversar agora →" : "Garantir agora →"}</a>
+              <a href={checkoutUrl}>{highTicket && /wa\.me|whatsapp\.com/i.test(product?.checkoutUrl ?? "") ? "Conversar agora →" : "Garantir agora →"}</a>
             </Button>
           </div>
         </div>
