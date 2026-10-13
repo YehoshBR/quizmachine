@@ -278,6 +278,11 @@ export function DiagnosticSalesPage({ quizId, quizMeta, screens, scoringMap, cfg
         <section className={`${section} border-t border-border bg-card/40`}>
           <div className="mx-auto max-w-xl text-center">
             <h2 className={h2}>{rich(nm(cfg.closing.title))}</h2>
+            {cfg.closing.byAnswer && cfg.closing.byAnswer.map[String(answers[cfg.closing.byAnswer.id] ?? "")] && (
+              <p className="mt-5 text-base leading-relaxed text-foreground">
+                {rich(nm(cfg.closing.byAnswer.map[String(answers[cfg.closing.byAnswer.id])]))}
+              </p>
+            )}
             <p className="mt-5 whitespace-pre-line text-base leading-relaxed text-muted-foreground">{rich(nm(cfg.closing.body))}</p>
             <Button asChild variant="outline" className="mt-7 h-12 px-8 font-bold">
               <a href="#escolha">Escolher o meu caminho ↑</a>

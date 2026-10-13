@@ -1105,7 +1105,8 @@ export interface SalesPageConfig {
     recommendLabel?: string;
     note?: string;
   };
-  closing?: { title: string; body: string };
+  /** `byAnswer`: frase do fechamento que muda conforme uma resposta (ex.: o que a pessoa disse que quer). */
+  closing?: { title: string; body: string; byAnswer?: { id: string; map: Record<string, string> } };
 }
 
 /** Condição opcional de qualquer tela: só aparece se a resposta de `id` estiver em `in`. */
