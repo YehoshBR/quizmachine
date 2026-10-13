@@ -337,7 +337,7 @@ function QuizPage() {
             </div>
           )}
           <p className="mt-4 whitespace-pre-line text-base leading-relaxed text-muted-foreground">
-            {screen.body}
+            {emphasize(screen.body)}
           </p>
           {screen.quote && (
             <blockquote className="mt-5 rounded-xl border-l-4 border-secondary bg-muted/50 p-4">
