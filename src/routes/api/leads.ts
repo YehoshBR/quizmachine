@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { insertLead, insertQuizEvent, getQuizById } from "@/lib/db";
+import { insertLead, insertQuizEvent, getQuizById, mergeLeadAnswers } from "@/lib/db";
 
 /** Dispara o webhook de leads configurado no painel (se houver). Nunca lança —
  * uma falha do endpoint do cliente não pode derrubar a captura do lead. */
@@ -32,6 +32,28 @@ export const Route = createFileRoute("/api/leads")({
         }
 
         const b = body as Record<string, unknown>;
+
+        // Etapa extra (ex.: @ do Instagram) depois do lead já salvo: anexa e avisa o webhook.
+        if (typeof b.leadId === "string" && b.extra && typeof b.extra === "object") {
+          const extra: Record<string, string> = {};
+          for (const [k, v] of Object.entries(b.extra as Record<string, unknown>).slice(0, 5)) {
+            if (/^[a-z0-9_]{1,40}$/i.test(k) && typeof v === "string" && v.trim()) extra[k] = v.trim().slice(0, 200);
+          }
+          if (!Object.keys(extra).length || !/^[0-9a-f-]{36}$/i.test(b.leadId)) {
+            return Response.json({ ok: true });
+          }
+          try {
+            const lead = await mergeLeadAnswers(b.leadId, extra);
+            const quiz = lead?.quiz_id ? await getQuizById(lead.quiz_id).catch(() => null) : null;
+            const webhookUrl = quiz?.quiz_meta?.leadWebhookUrl;
+            if (lead && webhookUrl) {
+              await fireLeadWebhook(webhookUrl, { event: "lead_extra", quizId: lead.quiz_id, ...lead, extra });
+            }
+          } catch (err) {
+            console.error("[api/leads] falha ao anexar etapa extra:", err);
+          }
+          return Response.json({ ok: true });
+        }
         const quizId = typeof b.quizId === "string" ? b.quizId : null;
         const sessionId = typeof b.sessionId === "string" ? b.sessionId.slice(0, 100) : null;
         const name = typeof b.name === "string" ? b.name : undefined;
@@ -42,7 +64,7 @@ export const Route = createFileRoute("/api/leads")({
         const utm = b.utm && typeof b.utm === "object" ? (b.utm as Record<string, unknown>) : {};
 
         try {
-          await insertLead({ quizId, name, email, whatsapp, answers, utm });
+          const leadId = await insertLead({ quizId, name, email, whatsapp, answers, utm });
 
           if (quizId && sessionId) {
             insertQuizEvent({ quizId, sessionId, eventType: "lead_submitted" }).catch((err) =>
@@ -66,7 +88,7 @@ export const Route = createFileRoute("/api/leads")({
             }
           }
 
-          return Response.json({ ok: true });
+          return Response.json({ ok: true, id: leadId });
         } catch (err) {
           console.error("[api/leads] falha ao salvar lead:", err);
           // Não bloqueia o funil do visitante por causa de um erro de banco —

@@ -137,11 +137,11 @@ export async function insertLead(input: {
   whatsapp?: string;
   answers: Record<string, unknown>;
   utm?: Record<string, unknown>;
-}): Promise<void> {
+}): Promise<string | null> {
   const db = getPool();
-  if (!db) return; // sem DB configurado: não quebra o funil, só não salva
-  await db.query(
-    `insert into leads (quiz_id, name, email, whatsapp, answers, utm) values ($1,$2,$3,$4,$5,$6)`,
+  if (!db) return null; // sem DB configurado: não quebra o funil, só não salva
+  const r = await db.query(
+    `insert into leads (quiz_id, name, email, whatsapp, answers, utm) values ($1,$2,$3,$4,$5,$6) returning id`,
     [
       input.quizId,
       input.name ?? null,
@@ -151,6 +151,21 @@ export async function insertLead(input: {
       JSON.stringify(input.utm ?? {}),
     ]
   );
+  return (r.rows[0]?.id as string) ?? null;
+}
+
+/** Anexa respostas extras (etapa opcional pós-formulário) a um lead já salvo. Devolve o lead atualizado. */
+export async function mergeLeadAnswers(
+  leadId: string,
+  extra: Record<string, string>
+): Promise<{ quiz_id: string | null; name: string | null; email: string | null; whatsapp: string | null; answers: Record<string, unknown>; utm: Record<string, unknown> } | null> {
+  const db = getPool();
+  if (!db) return null;
+  const r = await db.query(
+    `update leads set answers = answers || $2::jsonb where id = $1 returning quiz_id, name, email, whatsapp, answers, utm`,
+    [leadId, JSON.stringify(extra)]
+  );
+  return r.rows[0] ?? null;
 }
 
 export async function insertMediaAsset(input: {

@@ -86,8 +86,19 @@ function QuizPage() {
   const [loadingPct, setLoadingPct] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  // Etapa extra opcional depois do formulário de lead (ex.: @ do Instagram).
+  const [leadId, setLeadId] = useState<string | null>(null);
+  const [extraStage, setExtraStage] = useState(false);
+  const [extraUnlocked, setExtraUnlocked] = useState(false);
 
   const screen = screens[step];
+
+  useEffect(() => {
+    if (!extraStage || screen?.type !== "lead") return;
+    setExtraUnlocked(false);
+    const id = setTimeout(() => setExtraUnlocked(true), screen.extra?.unlockMs ?? 3500);
+    return () => clearTimeout(id);
+  }, [extraStage, screen]);
   const totalScreens = screens.length;
 
   const progress = useMemo(() => (step / (totalScreens - 1)) * 100, [step, totalScreens]);
@@ -485,6 +496,60 @@ function QuizPage() {
   }
 
   // ─────────── LEAD ───────────
+  if (screen.type === "lead" && extraStage && screen.extra) {
+    const ex = screen.extra;
+    const val = (leadValues[ex.field.id] ?? "").trim();
+    const finish = async () => {
+      if (val && leadId) {
+        try {
+          await fetch("/api/leads", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ leadId, extra: { [ex.field.id]: val } }),
+          });
+        } catch (err) {
+          console.error("Falha ao enviar etapa extra (seguindo o funil mesmo assim):", err);
+        }
+      }
+      persistAnswers({ ...answers, ...leadValues });
+      setAnalyzing(true);
+    };
+    return (
+      <QuizLayout progress={100} onBack={() => setExtraStage(false)}>
+        <div className="rounded-2xl bg-card p-4 shadow-sm sm:p-6">
+          <h2 className="text-center text-xl font-bold text-foreground sm:text-2xl">{ex.title}</h2>
+          {ex.subtitle && <p className="mt-2 text-center text-sm text-muted-foreground">{ex.subtitle}</p>}
+          <form
+            className="mt-6 space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (val || extraUnlocked) finish();
+            }}
+          >
+            <div>
+              <Label htmlFor={ex.field.id}>{ex.field.label}</Label>
+              <Input
+                id={ex.field.id}
+                type={ex.field.type}
+                placeholder={ex.field.placeholder}
+                value={leadValues[ex.field.id] ?? ""}
+                onChange={(e) => setLeadValues((v) => ({ ...v, [ex.field.id]: e.target.value }))}
+                className="mt-1 h-12 border-primary/70"
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={!val && !extraUnlocked}
+              className="min-h-14 w-full whitespace-normal text-balance px-4 py-3 text-base font-bold leading-tight"
+            >
+              {ex.ctaText ?? "CONTINUAR →"}
+            </Button>
+          </form>
+        </div>
+      </QuizLayout>
+    );
+  }
+
   if (screen.type === "lead") {
     const fields = quizMeta.leadFields;
     const valid = fields.every(
@@ -524,7 +589,7 @@ function QuizPage() {
                     if (v) utm[k] = v;
                   }
                 );
-                await fetch("/api/leads", {
+                const r = await fetch("/api/leads", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -537,12 +602,15 @@ function QuizPage() {
                     utm,
                   }),
                 });
+                const data = await r.json().catch(() => null);
+                if (data?.id) setLeadId(data.id);
               } catch (err) {
                 console.error("Falha ao enviar lead (seguindo o funil mesmo assim):", err);
               }
               persistAnswers({ ...answers, ...leadValues });
               setSubmitting(false);
-              setAnalyzing(true);
+              if (screen.extra) setExtraStage(true);
+              else setAnalyzing(true);
             }}
           >
             {fields.map((f) => (
@@ -557,7 +625,7 @@ function QuizPage() {
                     setLeadValues((v) => ({ ...v, [f.id]: e.target.value }))
                   }
                   required={f.required}
-                  className="mt-1 h-12"
+                  className="mt-1 h-12 border-primary/70"
                 />
               </div>
             ))}

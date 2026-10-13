@@ -100,7 +100,7 @@ export type SignalDef = {
 export interface LeadField {
   id: string;
   label: string;
-  placeholder: string;
+  placeholder?: string;
   type: "text" | "tel" | "email" | "number";
   required?: boolean;
 }
@@ -240,6 +240,15 @@ export type Screen =
       expertImage?: string;
       ctaText?: string;
       privacyText?: string;
+      /** Etapa extra opcional depois do envio (ex.: @ do Instagram). O lead já foi salvo;
+       *  o valor preenchido aqui é anexado às respostas dele. O botão libera sozinho após unlockMs. */
+      extra?: {
+        title: string;
+        subtitle?: string;
+        field: LeadField;
+        ctaText?: string;
+        unlockMs?: number;
+      };
     };
 
 // ============================================================
