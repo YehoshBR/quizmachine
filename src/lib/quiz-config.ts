@@ -55,6 +55,12 @@ export interface QuizMeta {
   /** Selo acima do card de preço (ex.: "Turma em formação"). Padrão depende do offerStyle. */
   offerBadge?: string;
   /**
+   * Página de diagnóstico personalizada (high ticket). Quando existe, a /oferta vira um diagnóstico:
+   * nome do lead, nível calculado, leitura das respostas, ponte, produto, objeções tiradas das
+   * respostas e escolha entre planos. `{nome}` em qualquer texto vira o primeiro nome do lead.
+   */
+  salesPage?: SalesPageConfig;
+  /**
    * Ofertas alternativas, abertas por `/oferta?plano=<chave>` (ex.: um downsell pra quem disse
    * que o investimento não cabe agora). Use junto com `offerRouteByAnswer` apontando a resposta
    * pra "/oferta?plano=<chave>". Mesmo formato de `product`.
@@ -1066,3 +1072,38 @@ export const screens: Screen[] = [
     durationMs: 4000,
   },
 ];
+
+/** Ver `QuizMeta.salesPage`. Textos aceitam *destaque* e `{nome}`. */
+export interface SalesPageConfig {
+  heroTitle: string;
+  heroSubtitle?: string;
+  /** Leitura das respostas: para cada pergunta, o texto que aparece conforme a resposta dada. */
+  findingsTitle: string;
+  findings: { id: string; map: Record<string, string> }[];
+  maxFindings?: number;
+  bridge?: { title: string; body: string };
+  product: { title: string; body: string; steps?: { title: string; text: string }[] };
+  proof?: { title: string; body: string };
+  /** Objeções: as personalizadas (pela resposta) aparecem primeiro, depois as fixas. */
+  objectionsTitle: string;
+  objections: { id: string; map: Record<string, { q: string; a: string }> }[];
+  faq?: { q: string; a: string }[];
+  choice: {
+    title: string;
+    subtitle?: string;
+    options: {
+      key: string;
+      label: string;
+      desc: string;
+      price: string;
+      installments?: string;
+      checkoutUrl: string;
+      cta: string;
+    }[];
+    /** Qual plano vem selecionado e marcado como recomendado, pela resposta de uma pergunta. */
+    recommend: { id: string; map: Record<string, string>; default: string };
+    recommendLabel?: string;
+    note?: string;
+  };
+  closing?: { title: string; body: string };
+}

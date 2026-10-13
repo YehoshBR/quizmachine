@@ -4,6 +4,7 @@ import { getTenantQuiz } from "@/lib/tenant";
 import { computeTopSignals, readPersistedAnswers } from "@/lib/signals";
 import { trackEvent } from "@/lib/tracking";
 import { Button } from "@/components/ui/button";
+import { DiagnosticSalesPage } from "@/components/DiagnosticSalesPage";
 
 export const Route = createFileRoute("/oferta")({
   loader: () => getTenantQuiz(),
@@ -89,7 +90,7 @@ function useCountdown(totalSeconds: number) {
 }
 
 function OfertaPage() {
-  const { id: quizId, quizMeta, screens } = Route.useLoaderData();
+  const { id: quizId, quizMeta, screens, scoringMap } = Route.useLoaderData();
   const highTicket = quizMeta.offerStyle === "high-ticket";
   // ?plano=<chave> abre uma oferta alternativa (ex.: downsell), definida em quizMeta.altProducts.
   const [planKey, setPlanKey] = useState<string | null>(null);
@@ -120,6 +121,20 @@ function OfertaPage() {
 
   const headline = topPain?.headline ?? (product ? `A hora de resolver isso é agora: *${product.name}*` : "Sua oferta personalizada");
   const subheadline = topPain?.body ?? product?.promise ?? "Configure quizMeta.product no painel pra ativar essa página.";
+
+  if (quizMeta.salesPage) {
+    return (
+      <DiagnosticSalesPage
+        quizId={quizId}
+        quizMeta={quizMeta}
+        screens={screens}
+        scoringMap={scoringMap}
+        cfg={quizMeta.salesPage}
+        planKey={planKey}
+        buildCheckoutUrl={buildCheckoutUrl}
+      />
+    );
+  }
 
   function trackCheckout() {
     if (quizId) trackEvent(quizId, "checkout_click", { data: { url: checkoutUrl } });

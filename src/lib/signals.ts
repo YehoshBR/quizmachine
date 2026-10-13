@@ -99,3 +99,20 @@ export function readPersistedAnswers(): Answers | null {
     return null;
   }
 }
+
+/** Pontuação 0–100 das respostas pelo scoringMap (mesma regra da tela de diagnóstico). */
+export function computeDiagnosisScore(
+  scoringMap: Record<string, Record<string, number>>,
+  answers: Answers
+): number {
+  let points = 0;
+  let maxPoints = 0;
+  for (const [screenId, pointMap] of Object.entries(scoringMap)) {
+    const answer = answers[screenId] as string | undefined;
+    const vals = Object.values(pointMap);
+    maxPoints += vals.length > 0 ? Math.max(...vals) : 0;
+    if (answer !== undefined) points += pointMap[answer] ?? 0;
+  }
+  if (maxPoints === 0) return 70;
+  return Math.round((points / maxPoints) * 100);
+}
