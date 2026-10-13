@@ -1107,3 +1107,9 @@ export interface SalesPageConfig {
   };
   closing?: { title: string; body: string };
 }
+
+/** Condição opcional de qualquer tela: só aparece se a resposta de `id` estiver em `in`. */
+export interface ShowIf {
+  id: string;
+  in: string[];
+}

@@ -1,11 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Fragment, createElement, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, createElement, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { QuizLayout } from "@/components/QuizLayout";
 import { OptionCard, OptionLabel } from "@/components/QuizCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { QuizMeta, Screen } from "@/lib/quiz-config";
+import type { QuizMeta, Screen, ShowIf } from "@/lib/quiz-config";
 import { getTenantQuiz } from "@/lib/tenant";
 import { persistAnswers } from "@/lib/signals";
 import { trackSession, trackHeadlineEvent, trackEvent, getOrCreateSessionId } from "@/lib/tracking";
@@ -103,11 +103,34 @@ function QuizPage() {
 
   const progress = useMemo(() => (step / (totalScreens - 1)) * 100, [step, totalScreens]);
 
-  const next = () => setStep((s) => Math.min(s + 1, totalScreens - 1));
-  const back = () => setStep((s) => Math.max(s - 1, 0));
+  // Telas com `showIf` só aparecem se a resposta indicada estiver na lista (ex.: pergunta de
+  // conteúdo só pra quem disse que produz conteúdo). O ref evita ler respostas atrasadas no avanço automático.
+  const answersRef = useRef<Answers>({});
+  const visible = (i: number) => {
+    const cond = (screens[i] as { showIf?: ShowIf }).showIf;
+    if (!cond) return true;
+    const v = answersRef.current[cond.id];
+    return typeof v === "string" && cond.in.includes(v);
+  };
+  const next = () =>
+    setStep((s) => {
+      let i = s + 1;
+      while (i < totalScreens - 1 && !visible(i)) i++;
+      return Math.min(i, totalScreens - 1);
+    });
+  const back = () =>
+    setStep((s) => {
+      let i = s - 1;
+      while (i > 0 && !visible(i)) i--;
+      return Math.max(i, 0);
+    });
 
   const setAnswer = (id: string, value: string | string[]) =>
-    setAnswers((a) => ({ ...a, [id]: value }));
+    setAnswers((a) => {
+      const n = { ...a, [id]: value };
+      answersRef.current = n;
+      return n;
+    });
 
   // Scroll to top on step change
   useEffect(() => {
