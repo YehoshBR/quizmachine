@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, createElement, useEffect, useMemo, useState, type ReactNode } from "react";
 import { QuizLayout } from "@/components/QuizLayout";
 import { OptionCard, OptionLabel } from "@/components/QuizCard";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,22 @@ import { persistAnswers } from "@/lib/signals";
 import { trackSession, trackHeadlineEvent, trackEvent, getOrCreateSessionId } from "@/lib/tracking";
 import { ThemedLoader } from "@/components/ThemedLoader";
 import { YoutubeFacade } from "@/components/YoutubeFacade";
+
+/** Troca *texto* por <strong> em cor forte (ex.: nomes numa prova social). Seguro (sem dangerouslySetInnerHTML). */
+function emphasize(text: string): ReactNode {
+  const parts: ReactNode[] = [];
+  const re = /\*([^*\n]+)\*/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let key = 0;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    parts.push(createElement("strong", { key: `e${key++}`, className: "font-bold text-foreground" }, m[1]));
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return createElement(Fragment, null, ...parts);
+}
 
 const IMG_PLACEHOLDER =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect width='200' height='200' fill='%23e2e8f0'/%3E%3Ccircle cx='100' cy='78' r='42' fill='%2394a3b8'/%3E%3Cellipse cx='100' cy='178' rx='66' ry='46' fill='%2394a3b8'/%3E%3C/svg%3E";
@@ -345,7 +361,7 @@ function QuizPage() {
           )}
 
           <p className="whitespace-pre-line text-base leading-relaxed text-muted-foreground">
-            {screen.body}
+            {emphasize(screen.body)}
           </p>
 
           {screen.image && (
