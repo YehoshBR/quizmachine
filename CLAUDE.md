@@ -371,3 +371,10 @@ dificultem plugar depois (ex: manter o submit do `lead` numa função única fá
 - **Animação pula:** verifique se `targetPct` é um número entre 0 e 100
 - **Lead não salva:** configure `SUPABASE_URL` e `SUPABASE_ANON_KEY` nas variáveis de ambiente
 - **LP errada:** verifique se `offerRouteByAnswer` tem o mesmo valor que a opção respondida no `quiz-config.ts`
+
+---
+
+## Figma
+
+Regras para transformar telas do Figma em código (tokens, componentes, assets, identidade O Caminho do Mentor):
+@FIGMA_DESIGN_SYSTEM.md
