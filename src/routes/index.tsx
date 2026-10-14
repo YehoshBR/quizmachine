@@ -215,8 +215,10 @@ function QuizPage() {
                   rounded="xl"
                   onClick={() => {
                     setAnswer("intro_first", opt.value);
+                    // atualiza o ref já aqui pra o `next` respeitar showIf baseado nesta resposta
+                    answersRef.current = { ...answersRef.current, intro_first: opt.value };
                     if (variant?.id) trackHeadlineEvent(variant.id, "cta_click");
-                    setStep(1);
+                    next();
                   }}
                 >
                   <img
