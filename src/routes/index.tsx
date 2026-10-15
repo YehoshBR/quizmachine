@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import type { QuizMeta, Screen, ShowIf } from "@/lib/quiz-config";
 import { getTenantQuiz } from "@/lib/tenant";
 import { persistAnswers } from "@/lib/signals";
-import { trackSession, trackHeadlineEvent, trackEvent, getOrCreateSessionId } from "@/lib/tracking";
+import { trackSession, trackHeadlineEvent, trackEvent, getOrCreateSessionId, pixelEvent } from "@/lib/tracking";
 import { ThemedLoader } from "@/components/ThemedLoader";
 import { YoutubeFacade } from "@/components/YoutubeFacade";
 
@@ -629,6 +629,7 @@ function QuizPage() {
                 });
                 const data = await r.json().catch(() => null);
                 if (data?.id) setLeadId(data.id);
+                if (r.ok) pixelEvent("Lead");
               } catch (err) {
                 console.error("Falha ao enviar lead (seguindo o funil mesmo assim):", err);
               }

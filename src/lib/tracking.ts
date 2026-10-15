@@ -64,6 +64,17 @@ export function trackHeadlineEvent(variantId: string, eventType: "view" | "cta_c
   post("/api/track/headline-event", { variantId, sessionId, eventType });
 }
 
+/** Evento padrão do Pixel da Meta (só dispara se o quiz tiver facebookPixelId configurado no painel). */
+export function pixelEvent(name: string, data?: Record<string, unknown>) {
+  if (typeof window === "undefined") return;
+  const fbq = (window as unknown as { fbq?: (...args: unknown[]) => void }).fbq;
+  try {
+    fbq?.("track", name, data ?? {});
+  } catch {
+    /* pixel nunca trava o funil */
+  }
+}
+
 /** Evento genérico do funil: 'screen_view', 'lead_submitted', 'checkout_click', etc. */
 export function trackEvent(
   quizId: string,
@@ -74,4 +85,5 @@ export function trackEvent(
   const sessionId = getOrCreateSessionId();
   if (!sessionId) return;
   post("/api/track/event", { quizId, sessionId, eventType, ...extra });
+  if (eventType === "checkout_click") pixelEvent("InitiateCheckout", { currency: "BRL", ...(extra?.data?.plano ? { content_name: String(extra.data.plano) } : {}) });
 }
