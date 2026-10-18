@@ -1123,6 +1123,14 @@ export interface SalesPageConfig {
       textoMeta: string;
     }[];
   };
+  /** Página premium: "para quem é" no lugar das dúvidas. Chamada no estilo carta ("Se você quer... Esse convite é pra você."). */
+  paraQuem?: {
+    titulo: string;
+    chamada: string;
+    rotulo?: string;
+    itens: string[];
+    aviso?: string;
+  };
   /** Objeções: as personalizadas (pela resposta) aparecem primeiro, depois as fixas. */
   objectionsTitle: string;
   objections: { id: string; map: Record<string, { q: string; a: string }> }[];

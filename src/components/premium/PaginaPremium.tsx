@@ -233,8 +233,11 @@ export function PaginaPremium(d: DadosPremium) {
             </section>
           )}
 
+          {/* PARA QUEM É (substitui as dúvidas quando existe) */}
+          {d.cfg.paraQuem && <ParaQuem pq={d.cfg.paraQuem} nm={d.nm} h2={h2} estiloTitulo={estiloTitulo} />}
+
           {/* OBJEÇÕES */}
-          {(d.objections.length > 0 || (d.cfg.faq?.length ?? 0) > 0) && (
+          {!d.cfg.paraQuem && (d.objections.length > 0 || (d.cfg.faq?.length ?? 0) > 0) && (
             <section className="px-5 py-20">
               <div className="mx-auto max-w-xl">
                 <Revela>
@@ -476,6 +479,62 @@ function Etapas({ passos, nm, estiloTitulo }: { passos: { title: string; text: s
         );
       })}
     </ol>
+  );
+}
+
+/* ---------- para quem é ---------- */
+
+function ParaQuem({
+  pq,
+  nm,
+  h2,
+  estiloTitulo,
+}: {
+  pq: NonNullable<SalesPageConfig["paraQuem"]>;
+  nm: (t: string) => string;
+  h2: string;
+  estiloTitulo: React.CSSProperties;
+}) {
+  return (
+    <section id="para-quem" className="relative overflow-hidden px-5 py-20">
+      <div aria-hidden className="pointer-events-none absolute left-1/2 top-24 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,color-mix(in_oklab,var(--primary)_12%,transparent),transparent_65%)]" />
+      <div className="relative mx-auto max-w-xl">
+        <Revela className="text-center">
+          <Rotulo>para quem é</Rotulo>
+          <h2 className={`${h2} mt-4`} style={estiloTitulo}>{rich(nm(pq.titulo))}</h2>
+        </Revela>
+        <Revela atraso={0.1} className="mt-8 rounded-b-lg rounded-t-[26px] border border-primary/40 bg-card/70 p-6 text-center">
+          <p className="whitespace-pre-line text-[17px] leading-relaxed text-foreground/90">{rich(nm(pq.chamada))}</p>
+        </Revela>
+        {pq.rotulo && (
+          <Revela className="mt-10">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary">{pq.rotulo}</p>
+          </Revela>
+        )}
+        <ul className="mt-4 space-y-3">
+          {pq.itens.map((t, i) => (
+            <m.li
+              key={t}
+              initial={{ opacity: 0, x: -16 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, margin: "0px 0px -40px 0px" }}
+              transition={{ duration: 0.55, delay: i * 0.1, ease: suave }}
+              className="flex gap-3 rounded-b-lg rounded-t-[20px] border border-border bg-card/60 p-4"
+            >
+              <span aria-hidden className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary to-secondary text-[13px] font-bold text-background">
+                ✓
+              </span>
+              <p className="text-[15px] leading-relaxed text-foreground/90">{rich(nm(t))}</p>
+            </m.li>
+          ))}
+        </ul>
+        {pq.aviso && (
+          <Revela className="mt-8">
+            <p className="border-l-2 border-primary pl-4 text-sm leading-relaxed text-muted-foreground">{rich(nm(pq.aviso))}</p>
+          </Revela>
+        )}
+      </div>
+    </section>
   );
 }
 
