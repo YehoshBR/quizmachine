@@ -1100,6 +1100,28 @@ export interface SalesPageConfig {
     particulas?: { imagem: string; largura: number; altura: number; olhos?: [number, number][] };
     /** Imagem pequena do logo (rodapé e fechamento). */
     selo?: string;
+    /** Roteiro da página em etapas curtas, mostrado no topo (a última costuma ser a opção de começar). */
+    roteiro?: string[];
+  };
+  /**
+   * Mapa personalizado (estilo premium): cada dimensão sai de uma resposta do quiz.
+   * `hoje` dá a % de hoje por resposta; `meta` é onde a pessoa chega com o produto.
+   * Vira o gráfico radar + as barras "hoje × depois" lado a lado + as maiores mudanças.
+   */
+  mapa?: {
+    titulo: string;
+    subtitulo?: string;
+    rotuloHoje: string;
+    rotuloMeta: string;
+    mudarTitulo: string;
+    dimensoes: {
+      rotulo: string;
+      id: string;
+      hoje: Record<string, number>;
+      textoHoje: Record<string, string>;
+      meta: number;
+      textoMeta: string;
+    }[];
   };
   /** Objeções: as personalizadas (pela resposta) aparecem primeiro, depois as fixas. */
   objectionsTitle: string;

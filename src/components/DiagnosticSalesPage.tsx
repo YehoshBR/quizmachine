@@ -101,6 +101,7 @@ export function DiagnosticSalesPage({ quizId, quizMeta, screens, scoringMap, cfg
     return (
       <PaginaPremium
         quizMeta={quizMeta}
+        answers={answers}
         cfg={cfg}
         nm={nm}
         diag={diag}

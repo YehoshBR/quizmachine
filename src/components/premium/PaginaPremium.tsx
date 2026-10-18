@@ -14,6 +14,7 @@ import {
 } from "framer-motion";
 import type { QuizMeta, SalesPageConfig, Screen } from "@/lib/quiz-config";
 import { LogoDeParticulas } from "./logo-particulas";
+import { LadoALado, Mudancas, Radar, montarDimensoes } from "./MapaDiagnostico";
 
 // ============================================================
 // PÁGINA DE DIAGNÓSTICO PREMIUM — ativada por salesPage.estilo = "premium"
@@ -29,6 +30,7 @@ type Opcao = SalesPageConfig["choice"]["options"][number];
 
 export type DadosPremium = {
   quizMeta: QuizMeta;
+  answers: Record<string, string | string[]>;
   cfg: SalesPageConfig;
   nm: (t: string) => string;
   diag?: Diag;
@@ -122,13 +124,16 @@ export function PaginaPremium(d: DadosPremium) {
 
           {/* NÍVEL */}
           {d.diag && d.pct !== null && (
-            <section className="px-5 pb-6">
+            <section id="nivel" className="scroll-mt-6 px-5 pb-6">
               <Nivel d={d} estiloTitulo={estiloTitulo} />
             </section>
           )}
 
+          {/* MAPA PERSONALIZADO: hoje × depois */}
+          {d.cfg.mapa && <SecaoMapa d={d} h2={h2} estiloTitulo={estiloTitulo} />}
+
           {/* O QUE AS RESPOSTAS MOSTRAM */}
-          {d.findings.length > 0 && (
+          {!d.cfg.mapa && d.findings.length > 0 && (
             <section className="px-5 py-20">
               <div className="mx-auto max-w-xl">
                 <Revela>
@@ -319,7 +324,7 @@ function Topo({ d, estiloTitulo, estiloMarca }: { d: DadosPremium; estiloTitulo:
     <header className="relative">
       <div
         ref={palco}
-        className={`relative isolate overflow-hidden ${part ? "h-[62svh] min-h-[420px] cursor-crosshair touch-pan-y" : "h-28"}`}
+        className={`relative isolate overflow-hidden ${part ? "h-[44svh] min-h-[300px] max-h-[460px] cursor-crosshair touch-pan-y" : "h-28"}`}
         onPointerMove={(e) => { const [x, y] = ponto(e); motor.current?.moverMouse(x, y); }}
         onPointerLeave={() => motor.current?.soltarMouse()}
         onPointerDown={(e) => { const [x, y] = ponto(e); motor.current?.explodir(x, y); }}
@@ -333,7 +338,7 @@ function Topo({ d, estiloTitulo, estiloMarca }: { d: DadosPremium; estiloTitulo:
         </div>
       </div>
 
-      <div className={`relative mx-auto max-w-xl px-5 text-center ${part ? "-mt-20" : ""}`}>
+      <div className={`relative mx-auto max-w-xl px-5 text-center ${part ? "-mt-12" : ""}`}>
         <m.p
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -356,7 +361,9 @@ function Topo({ d, estiloTitulo, estiloMarca }: { d: DadosPremium; estiloTitulo:
             </m.span>
           ))}
         </h1>
-        {d.cfg.heroSubtitle && (
+        {d.cfg.premium?.roteiro ? (
+          <Roteiro itens={d.cfg.premium.roteiro} />
+        ) : d.cfg.heroSubtitle && (
           <m.p
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
@@ -419,7 +426,7 @@ function Nivel({ d, estiloTitulo }: { d: DadosPremium; estiloTitulo: React.CSSPr
             className="mt-6 rounded-xl border border-border bg-background/60 p-4"
           >
             <p className="font-semibold text-foreground">{d.highlight.title}</p>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{d.highlight.body}</p>
+            {!d.cfg.mapa && <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{d.highlight.body}</p>}
           </m.div>
         )}
       </div>
@@ -608,5 +615,76 @@ function Escolha({ d, h2, estiloTitulo }: { d: DadosPremium; h2: string; estiloT
         <p className="mt-3 text-center text-xs text-muted-foreground">pagamento seguro · Pix ou cartão em até 12x</p>
       </div>
     </section>
+  );
+}
+
+/* ---------- roteiro da página no topo ---------- */
+
+const ALVOS = ["#nivel", "#mapa", "#mudar", "#escolha"];
+
+function Roteiro({ itens }: { itens: string[] }) {
+  return (
+    <m.ol
+      initial="h"
+      animate="v"
+      variants={{ v: { transition: { staggerChildren: 0.12, delayChildren: 0.9 } } }}
+      className="mx-auto mt-6 grid max-w-sm grid-cols-3 gap-2 text-left"
+    >
+      {itens.map((t, i) => {
+        const ultimo = i === itens.length - 1;
+        return (
+          <m.li key={t} variants={{ h: { opacity: 0, y: 12 }, v: { opacity: 1, y: 0 } }} className={ultimo ? "col-span-3" : ""}>
+            <a
+              href={ALVOS[i] ?? ALVOS[ALVOS.length - 1]}
+              className={`flex h-full items-center gap-2 rounded-xl border px-2.5 py-2.5 text-[12px] leading-tight transition-colors ${
+                ultimo ? "border-primary/70 bg-primary/10 text-secondary" : "border-border bg-card/60 text-foreground hover:border-primary/50"
+              }`}
+            >
+              <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-bold ${ultimo ? "bg-primary text-primary-foreground" : "border border-primary/50 text-primary"}`}>
+                {i + 1}
+              </span>
+              {t}
+            </a>
+          </m.li>
+        );
+      })}
+    </m.ol>
+  );
+}
+
+/* ---------- mapa: radar + lado a lado + o que muda ---------- */
+
+function SecaoMapa({ d, h2, estiloTitulo }: { d: DadosPremium; h2: string; estiloTitulo: React.CSSProperties }) {
+  const mapa = d.cfg.mapa!;
+  const dims = montarDimensoes(mapa, d.answers);
+  return (
+    <>
+      <section id="mapa" className="scroll-mt-6 px-5 py-16">
+        <div className="mx-auto max-w-xl">
+          <Revela className="text-center">
+            <Rotulo>o seu mapa</Rotulo>
+            <h2 className={`${h2} mt-4`} style={estiloTitulo}>{rich(d.nm(mapa.titulo))}</h2>
+            {mapa.subtitulo && <p className="mt-3 text-sm text-muted-foreground">{rich(d.nm(mapa.subtitulo))}</p>}
+          </Revela>
+          <div className="mt-8">
+            <Radar dims={dims} rotuloHoje={mapa.rotuloHoje} rotuloMeta={mapa.rotuloMeta} />
+          </div>
+          <div className="mt-10">
+            <LadoALado dims={dims} rotuloHoje={mapa.rotuloHoje} rotuloMeta={mapa.rotuloMeta} />
+          </div>
+        </div>
+      </section>
+      <section id="mudar" className="scroll-mt-6 px-5 py-14">
+        <div className="mx-auto max-w-xl">
+          <Revela className="text-center">
+            <Rotulo>o que precisa mudar</Rotulo>
+            <h2 className={`${h2} mt-4`} style={estiloTitulo}>{rich(d.nm(mapa.mudarTitulo))}</h2>
+          </Revela>
+          <div className="mt-8">
+            <Mudancas dims={dims} estiloTitulo={estiloTitulo} />
+          </div>
+        </div>
+      </section>
+    </>
   );
 }
