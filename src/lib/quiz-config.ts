@@ -1083,7 +1083,24 @@ export interface SalesPageConfig {
   maxFindings?: number;
   bridge?: { title: string; body: string };
   product: { title: string; body: string; steps?: { title: string; text: string }[] };
-  proof?: { title: string; body: string };
+  /** `imagens`: prints reais de resultado (só aparecem no estilo premium). */
+  proof?: { title: string; body: string; imagens?: { src: string; quem: string; destaque: string; legenda: string }[] };
+  /**
+   * "premium": versão viva da página (logo de partículas, barra de nível dourada, linha que se desenha,
+   * card do plano com borda girando, preço contando). Sem isso, a página padrão.
+   */
+  estilo?: "padrao" | "premium";
+  premium?: {
+    /** Fontes do Google Fonts: títulos e marca. Padrão: Playfair Display e Cinzel. */
+    fonteTitulo?: string;
+    fonteMarca?: string;
+    /** Nome em letras de marca no topo (ex.: "A MATILHA"). */
+    marca?: string;
+    /** Logo que vira partículas no topo. A imagem precisa liberar CORS (o canvas lê os pixels). */
+    particulas?: { imagem: string; largura: number; altura: number; olhos?: [number, number][] };
+    /** Imagem pequena do logo (rodapé e fechamento). */
+    selo?: string;
+  };
   /** Objeções: as personalizadas (pela resposta) aparecem primeiro, depois as fixas. */
   objectionsTitle: string;
   objections: { id: string; map: Record<string, { q: string; a: string }> }[];

@@ -3,6 +3,7 @@ import type { QuizMeta, Screen, SalesPageConfig } from "@/lib/quiz-config";
 import { computeDiagnosisScore, readPersistedAnswers } from "@/lib/signals";
 import { trackEvent } from "@/lib/tracking";
 import { Button } from "@/components/ui/button";
+import { PaginaPremium } from "@/components/premium/PaginaPremium";
 
 // ============================================================
 // PÁGINA DE DIAGNÓSTICO (high ticket) — ativada por quizMeta.salesPage
@@ -93,6 +94,30 @@ export function DiagnosticSalesPage({ quizId, quizMeta, screens, scoringMap, cfg
 
   function goCheckout() {
     if (quizId) trackEvent(quizId, "checkout_click", { data: { url: checkoutUrl, plano: option.key } });
+  }
+
+  if (cfg.estilo === "premium") {
+    const porResposta = cfg.closing?.byAnswer;
+    return (
+      <PaginaPremium
+        quizMeta={quizMeta}
+        cfg={cfg}
+        nm={nm}
+        diag={diag}
+        pct={pct}
+        levelIdx={levelIdx}
+        highlight={highlight}
+        findings={findings}
+        objections={objections}
+        closingByAnswer={porResposta ? porResposta.map[String(answers[porResposta.id] ?? "")] : undefined}
+        selected={selected}
+        recommended={recommended}
+        setSelected={setSelected}
+        option={option}
+        checkoutUrl={checkoutUrl}
+        goCheckout={goCheckout}
+      />
+    );
   }
 
   const section = "px-5 py-12";
