@@ -690,7 +690,8 @@ function Roteiro({ itens }: { itens: string[] }) {
       className="mx-auto mt-6 grid max-w-sm grid-cols-3 gap-2 text-left"
     >
       {itens.map((t, i) => {
-        const ultimo = i === itens.length - 1;
+        // só o item que leva à oferta (#escolha) ganha destaque e linha inteira
+        const ultimo = (ALVOS[i] ?? ALVOS[ALVOS.length - 1]) === "#escolha";
         return (
           <m.li key={t} variants={{ h: { opacity: 0, y: 12 }, v: { opacity: 1, y: 0 } }} className={ultimo ? "col-span-3" : ""}>
             <a
