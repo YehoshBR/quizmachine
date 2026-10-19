@@ -594,19 +594,18 @@ function AntesHoje({ antes, hoje, atraso }: { antes: string; hoje: string; atras
   const visivel = useInView(ref, { once: true, margin: "0px 0px -80px 0px" });
   return (
     <div ref={ref} className="rounded-2xl border border-[#2a2622] bg-[#0e0d0b] p-4">
-      <div className="relative inline-block">
-        <p className="text-[14px] text-[#8F887C]">
-          <span className="mr-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#E5484D]">antes</span>
-          {antes}
-        </p>
+      <p className="text-[14px] text-[#8F887C]">
+        <span className="mr-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#E5484D]">antes</span>
+        {/* risco que se desenha, linha por linha */}
         <m.span
-          aria-hidden
-          className="absolute left-0 top-1/2 h-px w-full origin-left bg-[#E5484D]"
-          initial={{ scaleX: 0 }}
-          animate={visivel ? { scaleX: 1 } : {}}
+          className="bg-[linear-gradient(#E5484D,#E5484D)] bg-no-repeat [background-position:0_56%] [box-decoration-break:clone] [-webkit-box-decoration-break:clone]"
+          initial={{ backgroundSize: "0% 1.5px" }}
+          animate={visivel ? { backgroundSize: "100% 1.5px" } : {}}
           transition={{ duration: 0.6, delay: 0.5 + atraso }}
-        />
-      </div>
+        >
+          {antes}
+        </m.span>
+      </p>
       <m.p
         className="mt-2 text-[16px] font-semibold text-[#F3EEE4]"
         initial={{ opacity: 0, y: 8 }}
@@ -802,7 +801,7 @@ function Preco({
                       transition={{ duration: 0.4, delay: 0.6 + i * 0.12 }}
                     />
                   </svg>
-                  {rich(b)}
+                  <span>{rich(b)}</span>
                 </li>
               ))}
             </ul>
