@@ -90,10 +90,29 @@ export interface PaginaScoreConfig {
   rotuloPior: string;
   dorTitulo?: string;
   historia: { titulo: string; foto: string; antes: string[]; hoje: string[]; assinatura: string };
-  dias: { titulo: string; subtitulo?: string; itens: { titulo: string; texto: string }[] };
+  dias: { titulo: string; subtitulo?: string; itens: { titulo: string; texto: string }[]; frase?: FraseResposta };
   app: { titulo: string; texto: string; imagem: string; itens: string[] };
-  preco: { titulo: string; selo: string; garantiaSelo: string };
+  preco: { titulo: string; selo: string; garantiaSelo: string; frase?: FraseResposta };
   fechamento: { frase: string; texto?: string };
+  /** Ficha do diagnóstico logo abaixo do medidor: respostas do quiz + alertas. */
+  laudo?: {
+    rotulo: string;
+    titulo: string;
+    /** Linha da ficha: mostra o rótulo da opção respondida na tela `tela` (sem o emoji). */
+    campos: { rotulo: string; tela: string }[];
+    alertasTitulo?: string;
+    /** Em ordem de prioridade; aparecem os 4 primeiros que baterem. `{resposta}` = opção respondida. */
+    alertas: { tela: string; valores: string[]; titulo: string; texto: string }[];
+  };
+  /** "Por onde o seu plano começa": as 3 áreas mais baixas do CPF, com o texto de cada uma. */
+  plano?: { rotulo: string; titulo: string; subtitulo?: string; areas: Record<string, string> };
+}
+
+/** Frase montada a partir de uma resposta: `textos[valor]`, ou `modelo` com `{resposta}`. */
+export interface FraseResposta {
+  tela: string;
+  modelo?: string;
+  textos?: Record<string, string>;
 }
 
 export interface ProductInfo {

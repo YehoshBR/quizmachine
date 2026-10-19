@@ -11,7 +11,7 @@ import {
   useSpring,
   useTransform,
 } from "framer-motion";
-import type { PaginaScoreConfig, QuizMeta, Screen } from "@/lib/quiz-config";
+import type { FraseResposta, PaginaScoreConfig, QuizMeta, Screen } from "@/lib/quiz-config";
 import { computeDiagnosisScore, computeTopSignals, readPersistedAnswers } from "@/lib/signals";
 import { trackEvent } from "@/lib/tracking";
 
@@ -48,6 +48,17 @@ function rich(texto: string): ReactNode {
   }
   if (ultimo < texto.length) partes.push(texto.slice(ultimo));
   return createElement(Fragment, null, ...partes);
+}
+
+/** value → rótulo (sem o emoji do começo) de cada tela de escolha. */
+function indiceRotulos(screens: Screen[]) {
+  const idx: Record<string, Record<string, string>> = {};
+  const limpa = (t: string) => t.replace(/^[^\p{L}\p{N}"“]+/u, "").trim();
+  for (const s of screens) {
+    if (s.type === "single") idx[s.id] = Object.fromEntries(s.options.map((o) => [o.value, limpa(o.label)]));
+    if (s.type === "intro") idx["intro_first"] = Object.fromEntries(s.firstOptions.map((o) => [o.value, limpa(o.label)]));
+  }
+  return idx;
 }
 
 function Conta({ alvo, ativo, atraso = 0, duracao = 1.6 }: { alvo: number; ativo: boolean; atraso?: number; duracao?: number }) {
@@ -115,6 +126,19 @@ export function PaginaScore({ quizId, quizMeta, screens, scoringMap, cfg, buildC
     [answers, screens, quizMeta.signalLibrary],
   );
 
+  const rotulos = useMemo(() => indiceRotulos(screens), [screens]);
+  const resposta = (tela: string) => {
+    const v = answers?.[tela];
+    return typeof v === "string" && v !== "" ? { valor: v, rotulo: rotulos[tela]?.[v] ?? v } : null;
+  };
+  const frase = (f?: FraseResposta) => {
+    const r = f && resposta(f.tela);
+    if (!f || !r) return null;
+    const t = f.textos?.[r.valor] ?? f.modelo;
+    return t ? nm(t.split("{resposta}").join(r.rotulo)) : null;
+  };
+  const piorCpf = [...areas].filter((a) => !a.cnpj).sort((a, b) => a.pct - b.pct).slice(0, 3);
+
   const topoRef = useRef<HTMLDivElement>(null);
   const topoVisivel = useInView(topoRef, { margin: "0px 0px -40% 0px" });
 
@@ -148,18 +172,38 @@ export function PaginaScore({ quizId, quizMeta, screens, scoringMap, cfg, buildC
                 <p className="text-[15px] leading-relaxed text-[#B9B2A6]">{rich(nm(cfg.topo.subtitulo))}</p>
               </Revela>
             )}
-            {!answers && (
-              <a href="/" className="mt-6 inline-block text-sm text-[#F0C878] underline underline-offset-4">
-                fazer o diagnóstico e ver o meu score →
-              </a>
-            )}
           </section>
+
+          {/* LAUDO: a ficha com as respostas e os alertas */}
+          {answers && cfg.laudo && score !== null && (
+            <Laudo
+              cfg={cfg}
+              nome={nome}
+              score={score}
+              campos={cfg.laudo.campos.flatMap((c) => {
+                const r = resposta(c.tela);
+                return r ? [{ rotulo: c.rotulo, valor: r.rotulo }] : [];
+              })}
+              alertas={cfg.laudo.alertas
+                .flatMap((a) => {
+                  const r = resposta(a.tela);
+                  if (!r || !a.valores.includes(r.valor)) return [];
+                  const troca = (t: string) => nm(t.split("{resposta}").join(r.rotulo));
+                  return [{ titulo: troca(a.titulo), texto: troca(a.texto) }];
+                })
+                .slice(0, 4)}
+              estilo={titulo}
+            />
+          )}
 
           {/* CPF × CNPJ: prédio e alicerce */}
           {areas.length > 0 && <Predio cfg={cfg} cpf={cpf} cnpj={cnpj} estilo={titulo} />}
 
           {/* AS ÁREAS */}
           {areas.length > 0 && <Areas cfg={cfg} areas={areas} estilo={titulo} />}
+
+          {/* POR ONDE O PLANO COMEÇA */}
+          {cfg.plano && piorCpf.length > 0 && <Plano cfg={cfg} areas={piorCpf} nome={nome} estilo={titulo} />}
 
           {/* O QUE AS RESPOSTAS REVELAM */}
           {sinais?.topPain && (
@@ -208,13 +252,13 @@ export function PaginaScore({ quizId, quizMeta, screens, scoringMap, cfg, buildC
           <Historia cfg={cfg} estilo={titulo} />
 
           {/* OS 7 DIAS */}
-          <Dias cfg={cfg} estilo={titulo} />
+          <Dias cfg={cfg} estilo={titulo} frase={frase(cfg.dias.frase)} />
 
           {/* O APP */}
           <AppNoCelular cfg={cfg} estilo={titulo} />
 
           {/* PREÇO */}
-          {produto && <Preco cfg={cfg} produto={produto} checkout={checkout} estilo={titulo} onClick={() => clicou("preco")} nome={nome} />}
+          {produto && <Preco cfg={cfg} produto={produto} checkout={checkout} estilo={titulo} onClick={() => clicou("preco")} nome={nome} frase={frase(cfg.preco.frase)} />}
 
           {/* FECHAMENTO */}
           <section className="relative px-5 pb-16 pt-10 text-center">
@@ -382,6 +426,183 @@ function Medidor({ score, faixas, estilo }: { score: number | null; faixas: Pagi
         )}
       </div>
     </div>
+  );
+}
+
+/* ---------- laudo: ficha com as respostas, carimbo da faixa e alertas ---------- */
+
+function Laudo({
+  cfg,
+  nome,
+  score,
+  campos,
+  alertas,
+  estilo,
+}: {
+  cfg: PaginaScoreConfig;
+  nome: string;
+  score: number;
+  campos: { rotulo: string; valor: string }[];
+  alertas: { titulo: string; texto: string }[];
+  estilo: React.CSSProperties;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const visivel = useInView(ref, { once: true, margin: "0px 0px -100px 0px" });
+  const { cor, faixa } = corDe(score, cfg.faixas);
+  const laudo = cfg.laudo!;
+  const hoje = new Date().toLocaleDateString("pt-BR");
+  const numero = String(1000 + ((nome.length * 7919 + score * 131 + campos.length * 17) % 9000));
+  const fimCampos = 0.35 + campos.length * 0.13;
+
+  return (
+    <section className="px-5 py-12">
+      <div className="mx-auto max-w-xl">
+        <Revela className="text-center">
+          <Rotulo>{nm0(laudo.rotulo, nome)}</Rotulo>
+          <h2 className="mt-3 text-[clamp(28px,7vw,44px)] font-bold uppercase leading-[1.05]" style={estilo}>{rich(nm0(laudo.titulo, nome))}</h2>
+        </Revela>
+        <div ref={ref} className="relative mt-8 overflow-hidden rounded-[22px] border border-[#D4A24C]/35 bg-[#0d0c0a] shadow-[0_30px_70px_-35px_rgba(212,162,76,.45)]">
+          {/* linha de leitura descendo pela ficha */}
+          <m.span
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 z-10 h-16 bg-gradient-to-b from-transparent via-[#F0C878]/15 to-transparent"
+            initial={{ top: "-12%" }}
+            animate={visivel ? { top: ["-12%", "105%"] } : {}}
+            transition={{ duration: fimCampos + 0.4, ease: "linear" }}
+          />
+          <div className="flex items-center justify-between border-b border-dashed border-[#3a352f] px-5 py-3 text-[10.5px] uppercase tracking-[0.2em] text-[#8F887C]">
+            <span>laudo nº {numero}</span>
+            <span>{hoje}</span>
+          </div>
+          <div className="px-5 pb-2 pt-5">
+            <p className="text-[10.5px] uppercase tracking-[0.24em] text-[#8F887C]">titular do CPF</p>
+            <p className="mt-1 text-[28px] font-bold uppercase leading-none" style={estilo}>{nome || "você"}</p>
+          </div>
+          <dl className="px-5 pb-5">
+            {campos.map((c, i) => (
+              <m.div
+                key={c.rotulo}
+                className="grid grid-cols-[42%_1fr] gap-3 border-b border-dashed border-[#2a2622] py-2.5 last:border-0"
+                initial={{ opacity: 0, x: -10 }}
+                animate={visivel ? { opacity: 1, x: 0 } : {}}
+                transition={{ duration: 0.45, delay: 0.35 + i * 0.13, ease: suave }}
+              >
+                <dt className="text-[11px] font-semibold uppercase leading-snug tracking-[0.14em] text-[#8F887C]">{c.rotulo}</dt>
+                <dd className="text-[14.5px] leading-snug text-[#F3EEE4]">{c.valor}</dd>
+              </m.div>
+            ))}
+          </dl>
+          {/* carimbo da faixa */}
+          <m.div
+            aria-hidden
+            className="absolute right-4 top-14 rounded-lg border-[3px] px-3 py-1.5 text-center"
+            style={{ borderColor: cor, color: cor, ...estilo }}
+            initial={{ opacity: 0, scale: 2.4, rotate: -24 }}
+            animate={visivel ? { opacity: 0.92, scale: 1, rotate: -12 } : {}}
+            transition={{ delay: fimCampos, type: "spring", stiffness: 380, damping: 16 }}
+          >
+            <span className="block text-[11px] font-bold tracking-[0.2em]">SCORE {score}</span>
+            <span className="block text-[20px] font-bold uppercase leading-none tracking-wider">{faixa.rotulo}</span>
+          </m.div>
+        </div>
+
+        {alertas.length > 0 && (
+          <div className="mt-8">
+            <Revela className="flex items-center gap-2">
+              <m.i
+                className="block h-2 w-2 rounded-full bg-[#E5484D]"
+                animate={{ opacity: [1, 0.2, 1], scale: [1, 1.4, 1] }}
+                transition={{ duration: 1.2, repeat: Infinity }}
+              />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#E5484D]">
+                {nm0(laudo.alertasTitulo ?? "alertas encontrados", nome)} · {alertas.length}
+              </p>
+            </Revela>
+            <div className="mt-4 space-y-3">
+              {alertas.map((a, i) => (
+                <Revela key={a.titulo} atraso={i * 0.08} className="relative overflow-hidden rounded-2xl border border-[#E5484D]/25 bg-[#120909] p-4 pl-5">
+                  <m.span
+                    aria-hidden
+                    className="absolute inset-y-0 left-0 w-1 origin-top bg-[#E5484D]"
+                    initial={{ scaleY: 0 }}
+                    whileInView={{ scaleY: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.8, delay: 0.2 + i * 0.08, ease: suave }}
+                  />
+                  <p className="text-[19px] font-bold uppercase leading-tight" style={estilo}>{rich(a.titulo)}</p>
+                  <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#CFC8BC]">{rich(a.texto)}</p>
+                </Revela>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function nm0(t: string, nome: string) {
+  return t.split("{nome}").join(nome || "você").replace(/^você, /, "");
+}
+
+/* ---------- por onde o plano começa: as 3 áreas mais baixas do CPF ---------- */
+
+function Plano({ cfg, areas, nome, estilo }: { cfg: PaginaScoreConfig; areas: Area[]; nome: string; estilo: React.CSSProperties }) {
+  const plano = cfg.plano!;
+  const ref = useRef<HTMLDivElement>(null);
+  const visivel = useInView(ref, { once: true, margin: "0px 0px -100px 0px" });
+  return (
+    <section className="px-5 py-14">
+      <div className="mx-auto max-w-xl">
+        <Revela className="text-center">
+          <Rotulo>{nm0(plano.rotulo, nome)}</Rotulo>
+          <h2 className="mt-3 text-[clamp(28px,7vw,44px)] font-bold uppercase leading-[1.05]" style={estilo}>{rich(nm0(plano.titulo, nome))}</h2>
+          {plano.subtitulo && <p className="mx-auto mt-3 max-w-md text-[15px] text-[#B9B2A6]">{rich(nm0(plano.subtitulo, nome))}</p>}
+        </Revela>
+        <div ref={ref} className="relative mt-10 pl-12">
+          {/* trilho que se desenha ligando os passos */}
+          <div aria-hidden className="absolute bottom-6 left-[19px] top-6 w-px bg-[#2a2622]" />
+          <m.div
+            aria-hidden
+            className="absolute bottom-6 left-[19px] top-6 w-px origin-top bg-gradient-to-b from-[#E5484D] via-[#F5C04A] to-[#3DD68C]"
+            initial={{ scaleY: 0 }}
+            animate={visivel ? { scaleY: 1 } : {}}
+            transition={{ duration: 1.6, delay: 0.2, ease: suave }}
+          />
+          <div className="space-y-5">
+            {areas.map((a, i) => {
+              const { cor } = corDe(a.pct, cfg.faixas);
+              return (
+                <m.div
+                  key={a.id}
+                  className="relative"
+                  initial={{ opacity: 0, y: 18 }}
+                  animate={visivel ? { opacity: 1, y: 0 } : {}}
+                  transition={{ duration: 0.6, delay: 0.3 + i * 0.35, ease: suave }}
+                >
+                  <span
+                    className="absolute -left-12 top-3 grid h-10 w-10 place-items-center rounded-full border-2 bg-[#050505] text-[17px] font-bold"
+                    style={{ borderColor: cor, color: cor, ...estilo }}
+                  >
+                    {i + 1}º
+                  </span>
+                  <div className="rounded-2xl border border-[#2a2622] bg-[#0e0d0b] p-5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{a.icone}</span>
+                      <span className="flex-1 text-[22px] font-bold uppercase leading-none" style={estilo}>{a.nome}</span>
+                      <span className="text-[13px] font-semibold [font-variant-numeric:tabular-nums]" style={{ color: cor }}>
+                        hoje: {a.pct}
+                      </span>
+                    </div>
+                    {plano.areas[a.id] && <p className="mt-2.5 text-[14.5px] leading-relaxed text-[#CFC8BC]">{rich(plano.areas[a.id])}</p>}
+                  </div>
+                </m.div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -621,7 +842,7 @@ function AntesHoje({ antes, hoje, atraso }: { antes: string; hoje: string; atras
 
 /* ---------- os 7 dias: carrossel com barra de progresso ---------- */
 
-function Dias({ cfg, estilo }: { cfg: PaginaScoreConfig; estilo: React.CSSProperties }) {
+function Dias({ cfg, estilo, frase }: { cfg: PaginaScoreConfig; estilo: React.CSSProperties; frase: string | null }) {
   const trilho = useRef<HTMLDivElement>(null);
   const [atual, setAtual] = useState(0);
   const total = cfg.dias.itens.length;
@@ -639,6 +860,14 @@ function Dias({ cfg, estilo }: { cfg: PaginaScoreConfig; estilo: React.CSSProper
         <h2 className="mx-auto mt-3 max-w-xl text-[clamp(28px,7vw,44px)] font-bold uppercase leading-[1.05]" style={estilo}>{rich(cfg.dias.titulo)}</h2>
         {cfg.dias.subtitulo && <p className="mx-auto mt-3 max-w-md text-[15px] text-[#B9B2A6]">{cfg.dias.subtitulo}</p>}
       </Revela>
+      {frase && (
+        <Revela atraso={0.15} className="mx-auto mt-6 max-w-md px-5">
+          <p className="rounded-2xl border border-[#D4A24C]/30 bg-[#120f08] px-5 py-4 text-center text-[15px] leading-relaxed text-[#E6E0D5]">
+            <span className="mb-1 block text-[10.5px] font-semibold uppercase tracking-[0.26em] text-[#D4A24C]">você respondeu</span>
+            {rich(frase)}
+          </p>
+        </Revela>
+      )}
       <div className="mx-auto mt-8 flex max-w-md gap-1.5 px-5">
         {cfg.dias.itens.map((_, i) => (
           <div key={i} className="h-1 flex-1 overflow-hidden rounded-full bg-[#2a2622]">
@@ -736,6 +965,7 @@ function Preco({
   estilo,
   onClick,
   nome,
+  frase,
 }: {
   cfg: PaginaScoreConfig;
   produto: NonNullable<QuizMeta["product"]>;
@@ -743,6 +973,7 @@ function Preco({
   estilo: React.CSSProperties;
   onClick: () => void;
   nome: string;
+  frase: string | null;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const visivel = useInView(ref, { once: true, margin: "0px 0px -80px 0px" });
@@ -754,6 +985,7 @@ function Preco({
         <Revela className="text-center">
           <Rotulo>{nome ? `${nome}, o seu próximo passo` : "o seu próximo passo"}</Rotulo>
           <h2 className="mt-3 text-[clamp(28px,7vw,42px)] font-bold uppercase leading-[1.05]" style={estilo}>{rich(cfg.preco.titulo)}</h2>
+          {frase && <p className="mx-auto mt-4 max-w-sm text-[16px] italic leading-relaxed text-[#E6E0D5]">{rich(frase)}</p>}
         </Revela>
         <Revela atraso={0.1} className="relative mt-10">
           {/* selo de garantia girando */}
