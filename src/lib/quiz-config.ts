@@ -61,11 +61,39 @@ export interface QuizMeta {
    */
   salesPage?: SalesPageConfig;
   /**
+   * Página de oferta do Score da Vida (low ticket com régua da vida): medidor do score, CPF × CNPJ
+   * como prédio e alicerce, barras das áreas, história, 7 dias, app no celular e preço.
+   * Quando existe (e não há salesPage), substitui a /oferta genérica. `{nome}` vira o primeiro nome.
+   */
+  paginaScore?: PaginaScoreConfig;
+  /**
    * Ofertas alternativas, abertas por `/oferta?plano=<chave>` (ex.: um downsell pra quem disse
    * que o investimento não cabe agora). Use junto com `offerRouteByAnswer` apontando a resposta
    * pra "/oferta?plano=<chave>". Mesmo formato de `product`.
    */
   altProducts?: Record<string, ProductInfo>;
+}
+
+/** Conteúdo da página de oferta do Score da Vida (ver `QuizMeta.paginaScore`). */
+export interface PaginaScoreConfig {
+  /** Fonte dos títulos (Google Fonts), ex.: "Barlow Condensed". */
+  fonteTitulo?: string;
+  topo: { rotulo: string; titulo: string; subtitulo?: string };
+  /** Áreas da régua: id da tela (0–4 pontos). `cnpj` = área da empresa (finanças, carreira). */
+  areas: { id: string; nome: string; icone: string; cnpj?: boolean }[];
+  /** Faixas do medidor, da menor pra maior (min em %). */
+  faixas: { min: number; rotulo: string; texto: string }[];
+  predio: { titulo: string; texto: string; rotuloCnpj: string; rotuloCpf: string };
+  areasTitulo: string;
+  areasSubtitulo?: string;
+  /** Rótulo das 3 áreas mais baixas. */
+  rotuloPior: string;
+  dorTitulo?: string;
+  historia: { titulo: string; foto: string; antes: string[]; hoje: string[]; assinatura: string };
+  dias: { titulo: string; subtitulo?: string; itens: { titulo: string; texto: string }[] };
+  app: { titulo: string; texto: string; imagem: string; itens: string[] };
+  preco: { titulo: string; selo: string; garantiaSelo: string };
+  fechamento: { frase: string; texto?: string };
 }
 
 export interface ProductInfo {

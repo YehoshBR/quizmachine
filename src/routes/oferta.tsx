@@ -5,6 +5,7 @@ import { computeTopSignals, readPersistedAnswers } from "@/lib/signals";
 import { trackEvent } from "@/lib/tracking";
 import { Button } from "@/components/ui/button";
 import { DiagnosticSalesPage } from "@/components/DiagnosticSalesPage";
+import { PaginaScore } from "@/components/score/PaginaScore";
 
 export const Route = createFileRoute("/oferta")({
   loader: () => getTenantQuiz(),
@@ -131,6 +132,19 @@ function OfertaPage() {
         scoringMap={scoringMap}
         cfg={quizMeta.salesPage}
         planKey={planKey}
+        buildCheckoutUrl={buildCheckoutUrl}
+      />
+    );
+  }
+
+  if (quizMeta.paginaScore) {
+    return (
+      <PaginaScore
+        quizId={quizId}
+        quizMeta={quizMeta}
+        screens={screens}
+        scoringMap={scoringMap}
+        cfg={quizMeta.paginaScore}
         buildCheckoutUrl={buildCheckoutUrl}
       />
     );

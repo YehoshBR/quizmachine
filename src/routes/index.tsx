@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { QuizMeta, Screen, ShowIf } from "@/lib/quiz-config";
 import { getTenantQuiz } from "@/lib/tenant";
-import { persistAnswers } from "@/lib/signals";
+import { persistAnswers, readPersistedAnswers } from "@/lib/signals";
 import { trackSession, trackHeadlineEvent, trackEvent, getOrCreateSessionId, pixelEvent } from "@/lib/tracking";
 import { ThemedLoader } from "@/components/ThemedLoader";
 import { YoutubeFacade } from "@/components/YoutubeFacade";
@@ -164,7 +164,8 @@ function QuizPage() {
       if (pct >= 100) {
         clearInterval(i);
         setTimeout(() => {
-          persistAnswers(answers);
+          // mescla com o que já foi salvo, pra não perder os dados do lead (nome etc.)
+          persistAnswers({ ...(readPersistedAnswers() ?? {}), ...answers });
           goToOffer(navigate as never, resolveOfferPath(quizMeta, answers));
         }, 300);
       }
