@@ -521,14 +521,7 @@ function Laudo({
             <div className="mt-4 space-y-3">
               {alertas.map((a, i) => (
                 <Revela key={a.titulo} atraso={i * 0.08} className="relative overflow-hidden rounded-2xl border border-[#E5484D]/25 bg-[#120909] p-4 pl-5">
-                  <m.span
-                    aria-hidden
-                    className="absolute inset-y-0 left-0 w-1 origin-top bg-[#E5484D]"
-                    initial={{ scaleY: 0 }}
-                    whileInView={{ scaleY: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.8, delay: 0.2 + i * 0.08, ease: suave }}
-                  />
+                  <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-[#E5484D]" />
                   <p className="text-[19px] font-bold uppercase leading-tight" style={estilo}>{rich(a.titulo)}</p>
                   <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#CFC8BC]">{rich(a.texto)}</p>
                 </Revela>
