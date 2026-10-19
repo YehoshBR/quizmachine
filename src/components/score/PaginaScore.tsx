@@ -378,7 +378,7 @@ function Medidor({ score, faixas, estilo }: { score: number | null; faixas: Pagi
         )}
         {/* ponteiro: varre o medidor inteiro e volta pra nota */}
         <m.g
-          style={{ transformOrigin: `${C}px ${C}px`, transformBox: "view-box" }}
+          style={{ originX: 0.5, originY: 1 }}
           initial={{ rotate: -90 }}
           animate={
             visivel
@@ -663,7 +663,7 @@ function Predio({ cfg, cpf, cnpj, estilo }: { cfg: PaginaScoreConfig; cpf: numbe
                 initial={{ opacity: 0, scaleY: 0 }}
                 animate={visivel ? { opacity: 1, scaleY: 1 } : {}}
                 transition={{ duration: 0.4, delay: 0.05 * i }}
-                style={{ transformOrigin: `${15 + i * 34}px ${base + 24}px` }}
+                style={{ originY: 1 }}
               />
             ))}
             {/* rachaduras quando o CPF é bem menor que o CNPJ */}
