@@ -207,6 +207,8 @@ export type Screen =
       title: string;
       body: string;
       image?: string;
+      /** Imagens extras (mostradas depois de `image`), no tamanho natural. */
+      images?: string[];
       highlight?: string;
       quote?: Quote;
     }
@@ -245,6 +247,8 @@ export type Screen =
       levelColors: string[];
       label: string;
       targetPct: number | "computed";
+      /** Ilustrações opcionais mostradas logo abaixo do título. */
+      images?: string[];
       cards?: { label: string; name: string; desc: string }[];
       highlightCard?: {
         color: "success" | "warning" | "danger";

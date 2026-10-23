@@ -357,11 +357,11 @@ function QuizPage() {
             </p>
           )}
           <h2 className="text-xl font-bold text-foreground sm:text-2xl">{screen.title}</h2>
-          {screen.image && (
-            <div className="my-3 overflow-hidden rounded-xl border border-border shadow-sm">
-              <img src={screen.image} alt="" className="w-full object-contain" loading="lazy" onError={onImgError} />
+          {[screen.image, ...(screen.images ?? [])].filter(Boolean).map((src) => (
+            <div key={src} className="my-3 overflow-hidden rounded-xl border border-border shadow-sm">
+              <img src={src} alt="" className="mx-auto h-auto max-w-full" loading="lazy" onError={onImgError} />
             </div>
-          )}
+          ))}
           <p className="mt-4 whitespace-pre-line text-base leading-relaxed text-muted-foreground">
             {emphasize(screen.body)}
           </p>
@@ -403,7 +403,7 @@ function QuizPage() {
 
           {screen.image && (
             <div className="mt-4 overflow-hidden rounded-xl border border-border shadow-sm">
-              <img src={screen.image} alt="Prova social" className="w-full object-contain" loading="lazy" onError={onImgError} />
+              <img src={screen.image} alt="Prova social" className="mx-auto h-auto max-w-full" loading="lazy" onError={onImgError} />
             </div>
           )}
 
@@ -731,6 +731,9 @@ function DiagnosisScreen({ screen, progress, onBack, onNext, answers, scoringMap
         {screen.subtitle && (
           <p className="mt-2 text-center text-sm text-muted-foreground">{screen.subtitle}</p>
         )}
+        {screen.images?.map((src) => (
+          <img key={src} src={src} alt="" className="mx-auto mt-4 h-auto max-w-full rounded-xl" loading="lazy" onError={onImgError} />
+        ))}
 
         {/* Barra de nível animada */}
         <div className="mt-6">
