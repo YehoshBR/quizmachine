@@ -35,6 +35,9 @@ function buildThemeCss(quizMeta: QuizMeta | undefined): string {
       "--input:oklch(0.19 0.003 264)"
     );
   }
+  if (quizMeta.backgroundColor) {
+    tokens.push(`--background:${quizMeta.backgroundColor}`);
+  }
   if (quizMeta.primaryColor) {
     tokens.push(`--primary:${quizMeta.primaryColor}`, `--ring:${quizMeta.primaryColor}`);
   }

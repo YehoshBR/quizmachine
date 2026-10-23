@@ -24,6 +24,8 @@ export interface QuizMeta {
   secondaryColor?: string;
   /** "dark" troca fundo/cards pra uma paleta escura (preto/carvão) antes de aplicar as cores acima. Padrão: "light". */
   backgroundMode?: "light" | "dark";
+  /** Cor de fundo da página (qualquer cor CSS), ex.: "#F3F5F6" pra um fundo gelo. Aplicada depois do backgroundMode; os cards continuam com a cor deles. */
+  backgroundColor?: string;
   /**
    * Dados do PRODUTO — sempre o mesmo produto, independente da resposta.
    * Preenchido uma vez no painel ao montar o quiz. A /oferta usa isso pra
