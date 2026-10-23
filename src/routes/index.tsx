@@ -731,9 +731,13 @@ function DiagnosisScreen({ screen, progress, onBack, onNext, answers, scoringMap
         {screen.subtitle && (
           <p className="mt-2 text-center text-sm text-muted-foreground">{screen.subtitle}</p>
         )}
-        {screen.images?.map((src) => (
-          <img key={src} src={src} alt="" className="mx-auto mt-4 h-auto max-w-full rounded-xl" loading="lazy" onError={onImgError} />
-        ))}
+        {screen.images && (
+          <div className="mt-4 flex justify-center gap-2">
+            {screen.images.map((src) => (
+              <img key={src} src={src} alt="" className="h-auto min-w-0 max-w-[50%] rounded-xl" loading="lazy" onError={onImgError} />
+            ))}
+          </div>
+        )}
 
         {/* Barra de nível animada */}
         <div className="mt-6">
