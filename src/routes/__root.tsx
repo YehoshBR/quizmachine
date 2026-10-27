@@ -45,7 +45,13 @@ function buildThemeCss(quizMeta: QuizMeta | undefined): string {
     tokens.push(`--secondary:${quizMeta.secondaryColor}`);
   }
 
-  return tokens.length ? `:root{${tokens.join(";")}}` : "";
+  let css = tokens.length ? `:root{${tokens.join(";")}}` : "";
+  if (quizMeta.headingStyle === "heavy") {
+    css +=
+      "main h1,main h2{font-weight:800;letter-spacing:-0.02em;line-height:1.15}" +
+      "main h2{font-size:1.6rem}main h2.italic{font-style:normal}";
+  }
+  return css;
 }
 
 /** Monta os scripts de rastreamento configurados no painel (Pixel + script customizado). */

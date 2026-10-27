@@ -52,8 +52,9 @@ type Answers = Record<string, string | string[]>;
 /** Opção sem imagem: emoji à esquerda + texto. `large` = versão maior (quizMeta.optionSize "lg"). */
 function EmojiLabel({ emoji, label, large }: { emoji?: string; label: string; large?: boolean }) {
   return (
-    <div className={large ? "flex min-h-16 items-center gap-4 px-5 py-4" : "flex items-center gap-3 px-5 py-4"}>
+    <div className={large ? "flex min-h-16 items-center gap-3 px-4 py-4" : "flex items-center gap-3 px-5 py-4"}>
       {emoji && <span className={large ? "text-3xl leading-none" : "text-2xl leading-none"}>{emoji}</span>}
+      {large && <span aria-hidden className="size-5 shrink-0 rounded-full border-2 border-border" />}
       <span className={large ? "text-lg font-medium text-foreground" : "text-base font-medium text-foreground"}>{label}</span>
     </div>
   );
@@ -285,7 +286,7 @@ function QuizPage() {
                 <OptionCard
                   key={opt.value}
                   selected={selected}
-                  rounded={hasImages ? "xl" : "full"}
+                  rounded={hasImages || quizMeta.optionSize === "lg" ? "xl" : "full"}
                   onClick={() => {
                     setAnswer(screen.id, opt.value);
                     setTimeout(next, 200);
@@ -397,11 +398,18 @@ function QuizPage() {
               className={cn(
                 "whitespace-pre-line text-base leading-relaxed",
                 screen.alert ? "mt-2 text-foreground" : "mt-4 text-muted-foreground",
+                screen.bodyBox === "danger" && "rounded-xl border border-red-200 bg-red-50 p-4 text-red-700",
+                screen.bodyBox === "success" && "rounded-xl border border-green-200 bg-green-50 p-4 text-green-800",
               )}
             >
               {emphasize(screen.body)}
             </p>
           </div>
+          {screen.closing && (
+            <p className="mt-5 text-center text-xl font-extrabold leading-tight text-foreground sm:text-2xl">
+              {screen.closing}
+            </p>
+          )}
           {screen.source && (
             <div className="mt-4 flex items-center gap-3 rounded-xl border border-border bg-muted/40 p-3">
               {screen.source.logo && (

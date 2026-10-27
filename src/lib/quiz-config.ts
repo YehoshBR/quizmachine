@@ -30,6 +30,8 @@ export interface QuizMeta {
   logoPlain?: boolean;
   /** "lg" deixa as opções sem imagem (single e scale) mais altas, com texto e emoji maiores — mais fáceis de tocar. Padrão: normal. */
   optionSize?: "normal" | "lg";
+  /** "heavy" = títulos e perguntas mais grossos e maiores (estilo LP de quiz de tráfego). Padrão: normal. */
+  headingStyle?: "normal" | "heavy";
   /**
    * Dados do PRODUTO — sempre o mesmo produto, independente da resposta.
    * Preenchido uma vez no painel ao montar o quiz. A /oferta usa isso pra
@@ -223,6 +225,10 @@ export type Screen =
       alert?: "danger" | "success";
       /** Fonte do dado, num quadro pequeno depois do texto (ex.: logo da universidade + nome da pesquisa). */
       source?: { text: string; logo?: string };
+      /** Só o texto (body) dentro de um quadro colorido; o título fica normal. */
+      bodyBox?: "danger" | "success";
+      /** Frase de fechamento em destaque, depois do texto (ex.: "A solução começa na sua mente..."). */
+      closing?: string;
     }
   | {
       id: string;
