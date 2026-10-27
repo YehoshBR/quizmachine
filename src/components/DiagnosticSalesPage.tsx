@@ -127,8 +127,8 @@ export function DiagnosticSalesPage({ quizId, quizMeta, screens, scoringMap, cfg
   return (
     <div className="min-h-screen bg-background">
       <header className="flex justify-center py-6">
-        <span className="inline-block rounded-xl bg-black px-4 py-2.5">
-          <img src={quizMeta.logo as string} alt={quizMeta.logoAlt} className="block h-10 w-auto" />
+        <span className={quizMeta.logoPlain ? "inline-block" : "inline-block rounded-xl bg-black px-4 py-2.5"}>
+          <img src={quizMeta.logo as string} alt={quizMeta.logoAlt} className={quizMeta.logoPlain ? "block h-14 w-auto" : "block h-10 w-auto"} />
         </span>
       </header>
 

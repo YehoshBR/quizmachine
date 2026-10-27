@@ -194,8 +194,8 @@ function QuizPage() {
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <div className="flex justify-center pt-4">
-          <span className="rounded-xl bg-black px-4 py-2.5">
-            <img src={quizMeta.logo as string} alt={quizMeta.logoAlt} className="block h-12 w-auto" onError={onImgError} />
+          <span className={quizMeta.logoPlain ? undefined : "rounded-xl bg-black px-4 py-2.5"}>
+            <img src={quizMeta.logo as string} alt={quizMeta.logoAlt} className={quizMeta.logoPlain ? "block h-16 w-auto" : "block h-12 w-auto"} onError={onImgError} />
           </span>
         </div>
         <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center px-4 py-4 text-center">

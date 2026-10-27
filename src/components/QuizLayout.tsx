@@ -16,7 +16,7 @@ export function QuizLayout({ progress, onBack, children, className }: QuizLayout
   const tenantMeta = useRouterState({
     select: (s) =>
       (s.matches.find((m) => m.routeId === "/")?.loaderData as
-        | { quizMeta?: { logo?: string; logoAlt?: string } }
+        | { quizMeta?: { logo?: string; logoAlt?: string; logoPlain?: boolean } }
         | undefined)?.quizMeta,
   });
   const logo = (tenantMeta?.logo ?? fallbackQuizMeta.logo) as string;
@@ -34,11 +34,11 @@ export function QuizLayout({ progress, onBack, children, className }: QuizLayout
               ←
             </button>
           )}
-          <span className="rounded-lg bg-black px-2.5 py-1.5">
+          <span className={tenantMeta?.logoPlain ? undefined : "rounded-lg bg-black px-2.5 py-1.5"}>
             <img
               src={logo}
               alt={logoAlt}
-              className="block h-7 w-auto"
+              className={tenantMeta?.logoPlain ? "block h-9 w-auto" : "block h-7 w-auto"}
               onError={(e) => { (e.target as HTMLImageElement).src = "/logo.svg"; }}
             />
           </span>

@@ -26,6 +26,8 @@ export interface QuizMeta {
   backgroundMode?: "light" | "dark";
   /** Cor de fundo da página (qualquer cor CSS), ex.: "#F3F5F6" pra um fundo gelo. Aplicada depois do backgroundMode; os cards continuam com a cor deles. */
   backgroundColor?: string;
+  /** true tira a pílula preta atrás do logo (pra logo com fundo transparente feito pra fundo claro). Padrão: pílula preta. */
+  logoPlain?: boolean;
   /**
    * Dados do PRODUTO — sempre o mesmo produto, independente da resposta.
    * Preenchido uma vez no painel ao montar o quiz. A /oferta usa isso pra

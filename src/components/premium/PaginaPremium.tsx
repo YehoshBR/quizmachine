@@ -335,7 +335,7 @@ function Topo({ d, estiloTitulo, estiloMarca }: { d: DadosPremium; estiloTitulo:
         <canvas ref={canvas} aria-hidden className="absolute inset-0 h-full w-full" />
         <div aria-hidden className="pointer-events-none absolute inset-0 [background:radial-gradient(ellipse_70%_65%_at_50%_46%,transparent_40%,var(--background)_100%)]" />
         <div className="absolute inset-x-0 top-5 flex justify-center">
-          <span className="inline-block rounded-xl bg-black/80 px-4 py-2.5 backdrop-blur">
+          <span className={d.quizMeta.logoPlain ? "inline-block" : "inline-block rounded-xl bg-black/80 px-4 py-2.5 backdrop-blur"}>
             <img src={d.quizMeta.logo as string} alt={d.quizMeta.logoAlt} className="block h-9 w-auto" />
           </span>
         </div>
