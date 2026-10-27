@@ -75,11 +75,74 @@ export interface QuizMeta {
    */
   paginaScore?: PaginaScoreConfig;
   /**
+   * Página de oferta low ticket montada por blocos, no formato "desafio de 21 dias" (modelo DMM):
+   * antes x depois, entregáveis, bônus, ancoragem, cupom com cronômetro, provas e garantia.
+   * Ver `PaginaDesafioConfig`.
+   */
+  paginaDesafio?: PaginaDesafioConfig;
+  /**
    * Ofertas alternativas, abertas por `/oferta?plano=<chave>` (ex.: um downsell pra quem disse
    * que o investimento não cabe agora). Use junto com `offerRouteByAnswer` apontando a resposta
    * pra "/oferta?plano=<chave>". Mesmo formato de `product`.
    */
   altProducts?: Record<string, ProductInfo>;
+}
+
+/** Imagem fixa ou uma por gênero (resposta da tela intro: "homem" / "mulher"). */
+export type ImagemGenero = string | { homem: string; mulher: string };
+
+/**
+ * Blocos da página de oferta "desafio" (ver `QuizMeta.paginaDesafio`). Em qualquer texto:
+ * `{nome}` = primeiro nome do lead, `*palavra*` = destaque em negrito na cor primária.
+ */
+export type BlocoDesafio =
+  | { tipo: "topo"; saudacao?: string; titulo: string; produto?: string }
+  | {
+      tipo: "antesDepois";
+      antes: ImagemGenero;
+      depois: ImagemGenero;
+      metricas: { titulo: string; antes: { rotulo: string; pct: number }; depois: { rotulo: string; pct: number } }[];
+    }
+  | { tipo: "apresentador"; foto: string; titulo: string; texto?: string }
+  | { tipo: "entregaveis"; titulo: string; itens: { titulo: string; imagem?: string }[] }
+  | { tipo: "destaque"; texto: string; tom?: "escuro" | "verde" | "azul" | "claro" }
+  | { tipo: "texto"; titulo?: string; texto?: string; centro?: boolean }
+  | { tipo: "imagens"; imagens: ImagemGenero[]; legenda?: string }
+  | { tipo: "progresso"; titulo: string; subtitulo?: string; pontos: { rotulo: string; valor: number; nota?: string }[] }
+  | {
+      tipo: "bonus";
+      titulo?: string;
+      itens: { titulo: string; subtitulo?: string; texto: string; valor: string; imagem?: string }[];
+    }
+  | { tipo: "ancoragem"; titulo?: string; itens: { nome: string; valor: string }[]; total: string; frase?: string; imagem?: string }
+  | { tipo: "oferta"; imagem?: string }
+  | { tipo: "provas"; titulo: string; imagens: string[] }
+  | { tipo: "lista"; titulo?: string; subtitulo?: string; icone: "check" | "x"; itens: string[] }
+  | { tipo: "estatisticas"; titulo?: string; subtitulo?: string; itens: { pct: number; texto: string }[] }
+  | { tipo: "garantia"; selo?: string; titulo: string; texto: string }
+  | { tipo: "rodape"; texto: string };
+
+export interface PaginaDesafioConfig {
+  /** Checkout. Aceita `{nome}`, `{email}` e `{whatsapp}` (preenchidos com o lead). */
+  checkoutUrl: string;
+  /** Card de preço, repetido em cada bloco `oferta`. */
+  preco: {
+    titulo: string;
+    de: string;
+    parcelado: string;
+    avista: string;
+    selo?: string;
+    cta: string;
+    /** Cupom mostrado acima do preço, ex.: "{nome}_98%OFF". */
+    cupom?: string;
+    /** Duração do cronômetro do cupom, em minutos. */
+    minutos?: number;
+    /** Linha de avaliação abaixo do botão, ex.: "4.8 estrelas de 1.912 avaliações". */
+    avaliacao?: string;
+    /** Imagem das bandeiras de cartão / Pix. */
+    bandeiras?: string;
+  };
+  blocos: BlocoDesafio[];
 }
 
 /** Conteúdo da página de oferta do Score da Vida (ver `QuizMeta.paginaScore`). */

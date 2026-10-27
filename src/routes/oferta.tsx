@@ -6,6 +6,7 @@ import { trackEvent } from "@/lib/tracking";
 import { Button } from "@/components/ui/button";
 import { DiagnosticSalesPage } from "@/components/DiagnosticSalesPage";
 import { PaginaScore } from "@/components/score/PaginaScore";
+import { PaginaDesafio } from "@/components/desafio/PaginaDesafio";
 
 export const Route = createFileRoute("/oferta")({
   loader: () => getTenantQuiz(),
@@ -122,6 +123,10 @@ function OfertaPage() {
 
   const headline = topPain?.headline ?? (product ? `A hora de resolver isso é agora: *${product.name}*` : "Sua oferta personalizada");
   const subheadline = topPain?.body ?? product?.promise ?? "Configure quizMeta.product no painel pra ativar essa página.";
+
+  if (quizMeta.paginaDesafio) {
+    return <PaginaDesafio quizId={quizId} quizMeta={quizMeta} cfg={quizMeta.paginaDesafio} buildCheckoutUrl={buildCheckoutUrl} />;
+  }
 
   if (quizMeta.salesPage) {
     return (
