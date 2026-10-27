@@ -410,14 +410,6 @@ function QuizPage() {
               {screen.closing}
             </p>
           )}
-          {screen.source && (
-            <div className="mt-4 flex items-center gap-3 rounded-xl border border-border bg-muted/40 p-3">
-              {screen.source.logo && (
-                <img src={screen.source.logo} alt="" className="h-14 w-auto shrink-0" loading="lazy" onError={onImgError} />
-              )}
-              <p className="text-sm leading-snug text-muted-foreground">{emphasize(screen.source.text)}</p>
-            </div>
-          )}
           {screen.quote && (
             <blockquote className="mt-5 rounded-xl border-l-4 border-secondary bg-muted/50 p-4">
               <p className="text-sm italic text-foreground">"{screen.quote.text}"</p>
@@ -429,6 +421,15 @@ function QuizPage() {
           <Button className="mt-6 h-12 w-full text-base font-bold" onClick={next}>
             Continuar →
           </Button>
+          {/* fonte depois do botão: o botão aparece sem rolar (como na LP de referência) */}
+          {screen.source && (
+            <div className="mt-4 flex items-center gap-3 rounded-xl border border-border bg-muted/40 p-3">
+              {screen.source.logo && (
+                <img src={screen.source.logo} alt="" className="h-14 w-auto shrink-0" loading="lazy" onError={onImgError} />
+              )}
+              <p className="text-sm leading-snug text-muted-foreground">{emphasize(screen.source.text)}</p>
+            </div>
+          )}
         </article>
       </QuizLayout>
     );
