@@ -1,63 +1,83 @@
-// Relatório de abandono por tela: quantas sessões chegaram em cada tela e
-// qual % caiu antes da próxima — pra achar a tela que está travando o funil.
+// Relatório de abandono por tela: quantas sessões chegaram em cada tela, quantas pararam
+// nela (última tela vista sem chegar na oferta) e quanto tempo levam pra responder — pra
+// achar a tela que está travando o funil. ?de=&ate= (ISO) filtram pelo início da sessão.
 import { createFileRoute } from "@tanstack/react-router";
 import { isAuthenticated } from "@/lib/auth-internal";
-import { getScreenFunnelStats, getQuizById } from "@/lib/db";
+import { getFunnelReport, getQuizById } from "@/lib/db";
+
+function screenLabel(s: { type: string } & Record<string, unknown>): string {
+  const t = s.type === "intro" ? s.headline : s.type === "single" || s.type === "scale" ? s.question : s.title;
+  return typeof t === "string" ? t.replace(/<\/?hl>/g, "").replace(/\*/g, "") : "";
+}
+
+function data(v: string | null, padrao: Date): Date {
+  const d = v ? new Date(v) : null;
+  return d && !Number.isNaN(d.getTime()) ? d : padrao;
+}
 
 export const Route = createFileRoute("/api/admin/funnel-stats")({
   server: {
     handlers: {
       GET: async ({ request }) => {
         if (!isAuthenticated()) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
-        const quizId = new URL(request.url).searchParams.get("quizId");
+        const params = new URL(request.url).searchParams;
+        const quizId = params.get("quizId");
         if (!quizId) return Response.json({ ok: false, error: "quizId obrigatório" }, { status: 400 });
 
         const quiz = await getQuizById(quizId);
         if (!quiz) return Response.json({ ok: false, error: "quiz não encontrado" }, { status: 404 });
 
-        const raw = await getScreenFunnelStats(quizId);
-        // 1 linha por step_index (o maior "reached" observado, caso o front tenha
-        // mandado o mesmo screen_id em steps diferentes por algum motivo).
-        const byStep = new Map<number, { screenId: string; reached: number }>();
-        for (const r of raw) {
-          const existing = byStep.get(r.stepIndex);
-          if (!existing || r.reached > existing.reached) byStep.set(r.stepIndex, { screenId: r.screenId, reached: r.reached });
-        }
-        const steps = [...byStep.entries()].sort((a, b) => a[0] - b[0]);
+        const ate = data(params.get("ate"), new Date(Date.now() + 60_000));
+        const de = data(params.get("de"), new Date(0));
+        const rel = await getFunnelReport(quizId, de, ate);
+        const porTela = new Map(rel.telas.map((t) => [t.screenId, t]));
+        const base = rel.totais.sessoes;
+        const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 1000) / 10 : null);
 
-        const screenLabel = (s: (typeof quiz.screens)[number]): string => {
-          switch (s.type) {
-            case "intro": return s.headline;
-            case "single": return s.question;
-            case "scale": return s.question;
-            case "content": return s.title;
-            case "social-proof": return s.title;
-            case "loading": return s.title;
-            case "diagnosis": return s.title;
-            case "compare": return s.title;
-            case "testimonials": return s.title;
-            case "mirror-chart": return s.title;
-            case "lead": return s.title;
-            default: return "";
-          }
-        };
-        const screenById = new Map(quiz.screens.map((s) => [s.id, s]));
-
-        const rows = steps.map(([stepIndex, { screenId, reached }], i) => {
-          const nextReached = steps[i + 1]?.[1]?.reached;
-          const dropoffPct = nextReached != null && reached > 0 ? Math.round((1 - nextReached / reached) * 1000) / 10 : null;
-          const screen = screenById.get(screenId);
+        const linha = (screenId: string, ordem: number | null, type: string, label: string, condicional: boolean) => {
+          const t = porTela.get(screenId);
+          const chegaram = t?.chegaram ?? 0;
+          const saiu = t?.saiu ?? 0;
           return {
-            stepIndex,
+            ordem,
             screenId,
-            type: screen?.type ?? "?",
-            label: screen ? screenLabel(screen) : screenId,
-            reached,
-            dropoffPct,
+            type,
+            label,
+            condicional,
+            chegaram,
+            pctInicio: pct(chegaram, base),
+            saiu,
+            saiuComLead: t?.saiuComLead ?? 0,
+            andamento: t?.andamento ?? 0,
+            taxaSaida: pct(saiu, chegaram),
+            tempoMedianoSeg: t?.tempoMedianoSeg ?? null,
           };
-        });
+        };
 
-        return Response.json({ ok: true, rows });
+        const conhecidas = new Set<string>();
+        const rows = quiz.screens.map((s, i) => {
+          conhecidas.add(s.id);
+          const sc = s as unknown as { type: string; showIf?: unknown } & Record<string, unknown>;
+          return linha(s.id, i + 1, s.type, screenLabel(sc), Boolean(sc.showIf));
+        });
+        // Telas que tiveram visita mas não existem mais no quiz (foram renomeadas/removidas)
+        for (const t of rel.telas) {
+          if (!conhecidas.has(t.screenId)) rows.push(linha(t.screenId, null, "?", "(tela removida do quiz)", false));
+        }
+
+        const { totais } = rel;
+        return Response.json({
+          ok: true,
+          rows,
+          totais: {
+            ...totais,
+            pctLead: pct(totais.leads, base),
+            pctOferta: pct(totais.ofertas, base),
+            pctCheckout: pct(totais.checkouts, base),
+            pctCheckoutDaOferta: pct(totais.checkouts, totais.ofertas),
+          },
+          testes: rel.testes,
+        });
       },
     },
   },

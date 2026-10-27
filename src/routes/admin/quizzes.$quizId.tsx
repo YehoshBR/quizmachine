@@ -20,7 +20,50 @@ const TIER_OPTIONS: { value: "curto" | "medio" | "longo"; label: string }[] = [
 type SignalRow = { key: string; label: string; kind: "pain" | "desire"; headline: string; body: string };
 type HeadlineVariantRow = { id: string; label: string; headline: string; subheadline: string | null; is_paused: boolean };
 type HeadlineStatRow = { variant: HeadlineVariantRow; views: number; ctaClicks: number; leads: number; checkoutClicks: number };
-type FunnelRow = { stepIndex: number; screenId: string; type: string; label: string; reached: number; dropoffPct: number | null };
+type FunnelRow = {
+  ordem: number | null;
+  screenId: string;
+  type: string;
+  label: string;
+  condicional: boolean;
+  chegaram: number;
+  pctInicio: number | null;
+  saiu: number;
+  saiuComLead: number;
+  andamento: number;
+  taxaSaida: number | null;
+  tempoMedianoSeg: number | null;
+};
+type FunnelTotais = {
+  sessoes: number;
+  leads: number;
+  ofertas: number;
+  checkouts: number;
+  saiuOferta: number;
+  andamento: number;
+  pctLead: number | null;
+  pctOferta: number | null;
+  pctCheckout: number | null;
+  pctCheckoutDaOferta: number | null;
+};
+type FunnelPeriodo = "hoje" | "ontem" | "7d" | "30d" | "tudo";
+
+/** Início/fim do período no fuso do navegador (o "hoje" de quem olha, não o do servidor). */
+function periodoDatas(p: FunnelPeriodo): { de?: string; ate?: string } {
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const dia = 86_400_000;
+  if (p === "hoje") return { de: hoje.toISOString() };
+  if (p === "ontem") return { de: new Date(hoje.getTime() - dia).toISOString(), ate: hoje.toISOString() };
+  if (p === "7d") return { de: new Date(hoje.getTime() - 6 * dia).toISOString() };
+  if (p === "30d") return { de: new Date(hoje.getTime() - 29 * dia).toISOString() };
+  return {};
+}
+
+function segundos(v: number | null): string {
+  if (v == null) return "—";
+  return v < 60 ? `${Math.round(v)}s` : `${Math.floor(v / 60)}min ${Math.round(v % 60)}s`;
+}
 
 function slugify(s: string): string {
   return s
@@ -128,6 +171,10 @@ function EditQuizPage() {
 
   // Abandono por tela
   const [funnelRows, setFunnelRows] = useState<FunnelRow[]>([]);
+  const [funnelTotais, setFunnelTotais] = useState<FunnelTotais | null>(null);
+  const [funnelTestes, setFunnelTestes] = useState(0);
+  const [funnelPeriodo, setFunnelPeriodo] = useState<FunnelPeriodo>("tudo");
+  const [funnelErro, setFunnelErro] = useState<string | null>(null);
   const [loadingFunnel, setLoadingFunnel] = useState(false);
 
   useEffect(() => {
@@ -149,14 +196,20 @@ function EditQuizPage() {
     }
   }
 
-  async function loadFunnelStats() {
+  async function loadFunnelStats(periodo: FunnelPeriodo = funnelPeriodo) {
     setLoadingFunnel(true);
+    setFunnelErro(null);
     try {
-      const res = await fetch(`/api/admin/funnel-stats?quizId=${quizId}`);
+      const q = new URLSearchParams({ quizId, ...periodoDatas(periodo) });
+      const res = await fetch(`/api/admin/funnel-stats?${q}`);
       const json = await res.json();
-      if (json.ok) setFunnelRows(json.rows);
-    } catch {
-      /* silencioso */
+      if (!json.ok) throw new Error(json.error ?? `erro ${res.status}`);
+      setFunnelRows(json.rows);
+      setFunnelTotais(json.totais);
+      setFunnelTestes(json.testes ?? 0);
+    } catch (err) {
+      // Não esconder: número velho na tela parece número certo.
+      setFunnelErro(err instanceof Error ? err.message : "falha ao carregar");
     } finally {
       setLoadingFunnel(false);
     }
@@ -1362,53 +1415,121 @@ function EditQuizPage() {
 
         {/* ---------- Abandono por tela ---------- */}
         <section className="rounded-2xl border border-border bg-card p-6">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-base font-bold text-foreground">Abandono por tela</h2>
-            <Button type="button" size="sm" variant="outline" onClick={loadFunnelStats} disabled={loadingFunnel}>
-              {loadingFunnel ? "Atualizando..." : "↻ Atualizar"}
-            </Button>
+            <div className="flex flex-wrap items-center gap-1">
+              {([["hoje", "Hoje"], ["ontem", "Ontem"], ["7d", "7 dias"], ["30d", "30 dias"], ["tudo", "Tudo"]] as const).map(([k, rotulo]) => (
+                <Button
+                  key={k}
+                  type="button"
+                  size="sm"
+                  variant={funnelPeriodo === k ? "default" : "outline"}
+                  onClick={() => {
+                    setFunnelPeriodo(k);
+                    loadFunnelStats(k);
+                  }}
+                  disabled={loadingFunnel}
+                >
+                  {rotulo}
+                </Button>
+              ))}
+              <Button type="button" size="sm" variant="outline" onClick={() => loadFunnelStats()} disabled={loadingFunnel}>
+                {loadingFunnel ? "Atualizando..." : "↻ Atualizar"}
+              </Button>
+            </div>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Quantas sessões chegaram em cada tela e quanto % caiu antes da próxima — pra achar a tela
-            que está travando o funil. Só aparece dado depois que o quiz recebe visitas reais.
+            <b>Saíram aqui</b> = pessoas cuja última tela foi essa e que não chegaram na oferta (sem atividade há 30 min).
+            Quem ainda está respondendo aparece como <b>em andamento</b>. Telas condicionais (ex.: só pra homem) só
+            contam quem passou por elas. Pra testar sem sujar os números, abra o quiz com <code>?teste=1</code> no fim do link.
           </p>
-          {funnelRows.length === 0 ? (
+          {funnelErro && (
+            <p className="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+              Não consegui carregar o relatório: {funnelErro}
+            </p>
+          )}
+          {funnelTotais && (
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+              {([
+                ["Começaram", funnelTotais.sessoes, null],
+                ["Deixaram o contato", funnelTotais.leads, funnelTotais.pctLead],
+                ["Viram a oferta", funnelTotais.ofertas, funnelTotais.pctOferta],
+                ["Clicaram em comprar", funnelTotais.checkouts, funnelTotais.pctCheckout],
+                ["Em andamento agora", funnelTotais.andamento, null],
+              ] as [string, number, number | null][]).map(([rotulo, n, p]) => (
+                <div key={rotulo} className="rounded-xl border border-border p-3">
+                  <p className="text-xs text-muted-foreground">{rotulo}</p>
+                  <p className="text-xl font-bold text-foreground">{n}</p>
+                  {p != null && <p className="text-xs text-muted-foreground">{p}% de quem começou</p>}
+                </div>
+              ))}
+            </div>
+          )}
+          {funnelTotais && funnelTotais.ofertas > 0 && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Na oferta: {funnelTotais.saiuOferta} saíram sem clicar · {funnelTotais.pctCheckoutDaOferta ?? 0}% de quem viu a oferta clicou em comprar.
+            </p>
+          )}
+          {funnelTestes > 0 && (
+            <p className="mt-1 text-xs text-muted-foreground">{funnelTestes} sessão(ões) de teste no período, fora da conta.</p>
+          )}
+          {!funnelTotais || funnelTotais.sessoes === 0 ? (
             <p className="mt-4 text-sm text-muted-foreground">
-              {loadingFunnel ? "Carregando..." : "Ainda sem dados de visitas registradas."}
+              {loadingFunnel ? "Carregando..." : "Ainda sem visitas registradas nesse período."}
             </p>
           ) : (
             <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[560px] text-left text-sm">
+              <table className="w-full min-w-[720px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-border text-xs uppercase text-muted-foreground">
                     <th className="py-2 pr-3">#</th>
                     <th className="py-2 pr-3">Tela</th>
-                    <th className="py-2 pr-3">Tipo</th>
-                    <th className="py-2 pr-3">Alcançou</th>
-                    <th className="py-2 pr-3">Abandono até a próxima</th>
+                    <th className="py-2 pr-3">Chegaram</th>
+                    <th className="py-2 pr-3">Saíram aqui</th>
+                    <th className="py-2 pr-3">Taxa de saída</th>
+                    <th className="py-2 pr-3">Tempo na tela</th>
                   </tr>
                 </thead>
                 <tbody>
                   {funnelRows.map((r) => (
-                    <tr key={r.screenId} className="border-b border-border/60">
-                      <td className="py-2 pr-3 text-muted-foreground">{r.stepIndex}</td>
-                      <td className="max-w-xs truncate py-2 pr-3 font-medium text-foreground">{r.label || r.screenId}</td>
-                      <td className="py-2 pr-3 text-muted-foreground">{r.type}</td>
-                      <td className="py-2 pr-3">{r.reached}</td>
+                    <tr key={r.screenId} className={r.chegaram === 0 ? "border-b border-border/60 opacity-50" : "border-b border-border/60"}>
+                      <td className="py-2 pr-3 text-muted-foreground">{r.ordem ?? "—"}</td>
+                      <td className="max-w-xs py-2 pr-3">
+                        <p className="truncate font-medium text-foreground" title={r.label || r.screenId}>{r.label || r.screenId}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {r.screenId} · {r.type}
+                          {r.condicional ? " · condicional" : ""}
+                        </p>
+                      </td>
                       <td className="py-2 pr-3">
-                        {r.dropoffPct == null ? (
+                        {r.chegaram}
+                        {r.pctInicio != null && <span className="ml-1 text-xs text-muted-foreground">({r.pctInicio}%)</span>}
+                      </td>
+                      <td className="py-2 pr-3">
+                        {r.saiu}
+                        {r.saiuComLead > 0 && (
+                          <span className="block text-xs text-muted-foreground">{r.saiuComLead} já deixaram o contato</span>
+                        )}
+                        {r.andamento > 0 && <span className="ml-1 text-xs text-muted-foreground">+{r.andamento} em andamento</span>}
+                      </td>
+                      <td className="py-2 pr-3">
+                        {r.taxaSaida == null || r.chegaram === 0 ? (
                           "—"
                         ) : (
-                          <span className={r.dropoffPct >= 30 ? "font-bold text-destructive" : r.dropoffPct >= 15 ? "font-semibold text-amber-600" : "text-muted-foreground"}>
-                            {r.dropoffPct >= 30 ? "⚠️ " : ""}
-                            {r.dropoffPct}%
+                          <span className={r.chegaram >= 20 && r.taxaSaida >= 15 ? "font-bold text-destructive" : r.chegaram >= 20 && r.taxaSaida >= 7 ? "font-semibold text-amber-600" : "text-muted-foreground"}>
+                            {r.chegaram >= 20 && r.taxaSaida >= 15 ? "⚠️ " : ""}
+                            {r.taxaSaida}%
                           </span>
                         )}
                       </td>
+                      <td className="py-2 pr-3 text-muted-foreground">{segundos(r.tempoMedianoSeg)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Alerta só aparece em tela com 20+ visitas (antes disso a porcentagem oscila demais). Tempo na tela = mediana até avançar.
+              </p>
             </div>
           )}
         </section>

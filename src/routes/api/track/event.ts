@@ -31,6 +31,10 @@ export const Route = createFileRoute("/api/track/event")({
         if (!quizId || !sessionId || !eventType) return Response.json({ ok: false }, { status: 400 });
         const data = b.data && typeof b.data === "object" ? (b.data as Record<string, unknown>) : undefined;
         if (!jsonSizeOk(data)) return Response.json({ ok: false }, { status: 400 });
+        // Horário do clique no navegador (evento reenviado chega atrasado). Só aceita até 24h
+        // pra trás e nunca no futuro; fora disso vale o horário do servidor.
+        const agora = Date.now();
+        const ts = typeof b.ts === "number" && b.ts <= agora && b.ts > agora - 86_400_000 ? new Date(b.ts) : undefined;
 
         try {
           await insertQuizEvent({
@@ -40,9 +44,13 @@ export const Route = createFileRoute("/api/track/event")({
             screenId: typeof b.screenId === "string" ? b.screenId.slice(0, 100) : undefined,
             stepIndex: typeof b.stepIndex === "number" ? Math.trunc(b.stepIndex) : undefined,
             data,
+            createdAt: ts,
+            isTest: b.isTest === true,
           });
         } catch (err) {
           console.error("[api/track/event] falha:", err);
+          // 500 faz o navegador guardar o evento e reenviar no próximo
+          return Response.json({ ok: false }, { status: 500 });
         }
         return Response.json({ ok: true });
       },

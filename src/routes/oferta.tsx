@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createElement, Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { getTenantQuiz } from "@/lib/tenant";
 import { computeTopSignals, readPersistedAnswers } from "@/lib/signals";
-import { trackEvent } from "@/lib/tracking";
+import { hasSession, trackEvent } from "@/lib/tracking";
 import { Button } from "@/components/ui/button";
 import { DiagnosticSalesPage } from "@/components/DiagnosticSalesPage";
 import { PaginaScore } from "@/components/score/PaginaScore";
@@ -97,6 +97,10 @@ function OfertaPage() {
   // ?plano=<chave> abre uma oferta alternativa (ex.: downsell), definida em quizMeta.altProducts.
   const [planKey, setPlanKey] = useState<string | null>(null);
   const [leadName, setLeadName] = useState<string | undefined>(undefined);
+  // Chegou na oferta vindo do quiz: fecha o funil no relatório de abandono (link direto não conta).
+  useEffect(() => {
+    if (quizId && hasSession()) trackEvent(quizId, "offer_view");
+  }, [quizId]);
   useEffect(() => {
     setPlanKey(new URLSearchParams(window.location.search).get("plano"));
   }, []);

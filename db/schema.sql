@@ -111,3 +111,6 @@ create table if not exists quiz_events (
 create index if not exists idx_quiz_events_quiz_id on quiz_events(quiz_id);
 create index if not exists idx_quiz_events_screen_id on quiz_events(quiz_id, screen_id);
 create index if not exists idx_quiz_events_created_at on quiz_events(created_at desc);
+-- Relatório de abandono: eventos de uma sessão em ordem; sessões de teste (?teste=1) ficam fora.
+create index if not exists idx_quiz_events_sessao on quiz_events(quiz_id, session_id, created_at);
+alter table quiz_sessions add column if not exists is_test boolean not null default false;

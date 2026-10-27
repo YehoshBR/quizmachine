@@ -6,6 +6,25 @@
 // ============================================================
 
 const SESSION_KEY = "quiz_session_id";
+const TEST_KEY = "quiz_teste";
+const QUEUE_KEY = "quiz_track_fila";
+const QUEUE_MAX = 60;
+
+/**
+ * Sessão de teste: abrir o quiz com `?teste=1` marca a aba inteira (quiz + oferta) como teste,
+ * e o relatório de abandono ignora essas sessões. `?teste=0` desmarca.
+ */
+export function isTestSession(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const p = new URLSearchParams(window.location.search).get("teste");
+    if (p === "1") sessionStorage.setItem(TEST_KEY, "1");
+    if (p === "0") sessionStorage.removeItem(TEST_KEY);
+    return sessionStorage.getItem(TEST_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 export function getOrCreateSessionId(): string {
   if (typeof window === "undefined") return "";
@@ -21,16 +40,65 @@ export function getOrCreateSessionId(): string {
   }
 }
 
-function post(url: string, body: unknown) {
+type Pendente = { url: string; body: unknown };
+
+function lerFila(): Pendente[] {
   try {
-    fetch(url, {
+    return JSON.parse(sessionStorage.getItem(QUEUE_KEY) || "[]") as Pendente[];
+  } catch {
+    return [];
+  }
+}
+
+function gravarFila(fila: Pendente[]) {
+  try {
+    if (fila.length) sessionStorage.setItem(QUEUE_KEY, JSON.stringify(fila.slice(-QUEUE_MAX)));
+    else sessionStorage.removeItem(QUEUE_KEY);
+  } catch {
+    /* sessionStorage cheio/bloqueado — perde só o reenvio */
+  }
+}
+
+function enviar(item: Pendente) {
+  try {
+    fetch(item.url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(item.body),
       keepalive: true,
-    }).catch(() => {});
+    })
+      .then((res) => {
+        // 5xx = o servidor não gravou (ex.: banco fora): guarda pra reenviar. 4xx = payload inválido, descarta.
+        if (res.status >= 500) gravarFila([...lerFila(), item]);
+      })
+      .catch(() => gravarFila([...lerFila(), item]));
   } catch {
     // navegador sem fetch/keepalive nesse contexto — ignora, nunca bloqueia o funil
+  }
+}
+
+/**
+ * Fire and forget, com reenvio: evento que falhou (rede do celular caiu, servidor reiniciando)
+ * fica numa fila na aba e vai junto no próximo evento. Cada evento leva o horário do clique (`ts`),
+ * então o reenvio atrasado não bagunça o tempo por tela.
+ */
+function post(url: string, body: unknown) {
+  if (typeof window === "undefined") return;
+  const fila = lerFila();
+  if (fila.length) {
+    gravarFila([]);
+    fila.forEach(enviar);
+  }
+  enviar({ url, body });
+}
+
+/** A aba já passou pelo quiz (tem sessão)? Quem abre a /oferta direto pelo link não tem. */
+export function hasSession(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return Boolean(sessionStorage.getItem(SESSION_KEY));
+  } catch {
+    return false;
   }
 }
 
@@ -53,6 +121,7 @@ export function trackSession(quizId: string, variantId?: string | null) {
     userAgent: navigator.userAgent,
     deviceType: /Mobi|Android/i.test(navigator.userAgent) ? "mobile" : "desktop",
     utm,
+    isTest: isTestSession(),
   });
 }
 
@@ -84,6 +153,6 @@ export function trackEvent(
   if (!quizId) return;
   const sessionId = getOrCreateSessionId();
   if (!sessionId) return;
-  post("/api/track/event", { quizId, sessionId, eventType, ...extra });
+  post("/api/track/event", { quizId, sessionId, eventType, ts: Date.now(), isTest: isTestSession(), ...extra });
   if (eventType === "checkout_click") pixelEvent("InitiateCheckout", { currency: "BRL", ...(extra?.data?.plano ? { content_name: String(extra.data.plano) } : {}) });
 }

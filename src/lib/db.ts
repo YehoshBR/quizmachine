@@ -291,13 +291,15 @@ export async function upsertQuizSession(input: {
   userAgent?: string;
   referrer?: string;
   utm?: Record<string, unknown>;
+  isTest?: boolean;
 }): Promise<void> {
   const db = getPool();
   if (!db) return;
+  // Sessão que virou teste depois (?teste=1 numa recarga) é marcada; nunca desmarca.
   await db.query(
-    `insert into quiz_sessions (quiz_id, session_id, variant_id, device_type, user_agent, referrer, utm)
-     values ($1,$2,$3,$4,$5,$6,$7)
-     on conflict (quiz_id, session_id) do nothing`,
+    `insert into quiz_sessions (quiz_id, session_id, variant_id, device_type, user_agent, referrer, utm, is_test)
+     values ($1,$2,$3,$4,$5,$6,$7,$8)
+     on conflict (quiz_id, session_id) do update set is_test = quiz_sessions.is_test or excluded.is_test`,
     [
       input.quizId,
       input.sessionId,
@@ -306,6 +308,7 @@ export async function upsertQuizSession(input: {
       input.userAgent ?? null,
       input.referrer ?? null,
       JSON.stringify(input.utm ?? {}),
+      input.isTest === true,
     ]
   );
 }
@@ -330,12 +333,23 @@ export async function insertQuizEvent(input: {
   screenId?: string;
   stepIndex?: number;
   data?: Record<string, unknown>;
+  /** Horário em que aconteceu no navegador (evento reenviado). Padrão: agora. */
+  createdAt?: Date;
+  /** Evento de sessão de teste: garante a sessão marcada como teste mesmo se o /session falhou. */
+  isTest?: boolean;
 }): Promise<void> {
   const db = getPool();
   if (!db) return;
+  if (input.isTest) {
+    await db.query(
+      `insert into quiz_sessions (quiz_id, session_id, is_test) values ($1,$2,true)
+       on conflict (quiz_id, session_id) do update set is_test = true`,
+      [input.quizId, input.sessionId]
+    );
+  }
   await db.query(
-    `insert into quiz_events (quiz_id, session_id, screen_id, step_index, event_type, data)
-     values ($1,$2,$3,$4,$5,$6)`,
+    `insert into quiz_events (quiz_id, session_id, screen_id, step_index, event_type, data, created_at)
+     values ($1,$2,$3,$4,$5,$6,coalesce($7, now()))`,
     [
       input.quizId,
       input.sessionId,
@@ -343,25 +357,123 @@ export async function insertQuizEvent(input: {
       input.stepIndex ?? null,
       input.eventType,
       JSON.stringify(input.data ?? {}),
+      input.createdAt ?? null,
     ]
   );
 }
 
-/** Quantas sessões distintas chegaram (deram "screen_view") em cada tela — base do relatório de abandono por tela. */
-export async function getScreenFunnelStats(
-  quizId: string
-): Promise<{ screenId: string; stepIndex: number; reached: number }[]> {
+/** Sessão sem evento novo há mais que isso conta como "saiu"; antes disso, "em andamento". */
+const INATIVA = "30 minutes";
+
+export type FunnelReport = {
+  /** Por tela (id): sessões que viram a tela, que pararam nela e o tempo mediano até a próxima. */
+  telas: {
+    screenId: string;
+    chegaram: number;
+    saiu: number;
+    /** Dos que saíram aqui, quantos já tinham deixado o contato (fecharam na análise, antes da oferta). */
+    saiuComLead: number;
+    andamento: number;
+    tempoMedianoSeg: number | null;
+  }[];
+  totais: {
+    sessoes: number;
+    leads: number;
+    ofertas: number;
+    checkouts: number;
+    /** Viram a oferta e foram embora sem clicar no checkout. */
+    saiuOferta: number;
+    andamento: number;
+  };
+  /** Sessões marcadas como teste (?teste=1) no período, fora do relatório. */
+  testes: number;
+};
+
+/**
+ * Relatório de abandono por tela. Cada sessão "sai" na ÚLTIMA tela que viu (se não chegou
+ * na oferta) — assim telas condicionais (ex.: idade de homem x de mulher) não distorcem a
+ * conta, e quem voltou uma tela e fechou conta onde realmente parou. Período = sessões que
+ * começaram entre `de` e `ate`. Sessões de teste ficam de fora.
+ */
+export async function getFunnelReport(quizId: string, de: Date, ate: Date): Promise<FunnelReport> {
+  const vazio: FunnelReport = {
+    telas: [],
+    totais: { sessoes: 0, leads: 0, ofertas: 0, checkouts: 0, saiuOferta: 0, andamento: 0 },
+    testes: 0,
+  };
   const db = getPool();
-  if (!db) return [];
-  const { rows } = await db.query<{ screen_id: string; step_index: number; reached: string }>(
-    `select screen_id, step_index, count(distinct session_id) as reached
-     from quiz_events
-     where quiz_id = $1 and event_type = 'screen_view' and screen_id is not null and step_index is not null
-     group by screen_id, step_index
-     order by step_index asc`,
-    [quizId]
+  if (!db) return vazio;
+  const { rows } = await db.query<{ telas: FunnelReport["telas"] | null; totais: FunnelReport["totais"]; testes: number }>(
+    `with teste as (
+       select session_id from quiz_sessions where quiz_id = $1 and is_test
+     ),
+     base as (
+       select e.session_id, e.screen_id, e.event_type, e.created_at
+       from quiz_events e
+       where e.quiz_id = $1 and e.session_id not in (select session_id from teste)
+     ),
+     ses as (
+       select session_id,
+         max(created_at) as fim,
+         bool_or(event_type = 'lead_submitted') as lead,
+         bool_or(event_type = 'offer_view') as oferta,
+         bool_or(event_type = 'checkout_click') as checkout
+       from base
+       group by session_id
+       having min(created_at) >= $2 and min(created_at) < $3
+     ),
+     vis as (
+       select b.session_id, b.screen_id, b.created_at,
+         lead(b.created_at) over w as prox_em,
+         lead(b.screen_id) over w as prox_tela
+       from base b join ses using (session_id)
+       where b.event_type = 'screen_view' and b.screen_id is not null
+       window w as (partition by b.session_id order by b.created_at)
+     ),
+     ultima as (
+       select distinct on (session_id) session_id, screen_id from vis order by session_id, created_at desc
+     ),
+     chegada as (
+       select screen_id,
+         count(distinct session_id)::int as chegaram,
+         percentile_cont(0.5) within group (order by extract(epoch from prox_em - created_at))
+           filter (where prox_tela is distinct from screen_id and prox_em - created_at < interval '${INATIVA}') as tempo
+       from vis group by screen_id
+     ),
+     saida as (
+       select u.screen_id,
+         count(*) filter (where not s.oferta and s.fim < now() - interval '${INATIVA}')::int as saiu,
+         count(*) filter (where not s.oferta and s.lead and s.fim < now() - interval '${INATIVA}')::int as saiu_lead,
+         count(*) filter (where not s.oferta and s.fim >= now() - interval '${INATIVA}')::int as andamento
+       from ultima u join ses s using (session_id)
+       group by u.screen_id
+     )
+     select
+       (select json_agg(json_build_object(
+           'screenId', c.screen_id, 'chegaram', c.chegaram,
+           'saiu', coalesce(x.saiu, 0), 'saiuComLead', coalesce(x.saiu_lead, 0), 'andamento', coalesce(x.andamento, 0),
+           'tempoMedianoSeg', round(c.tempo::numeric, 1)))
+        from chegada c left join saida x using (screen_id)) as telas,
+       (select json_build_object(
+           'sessoes', count(*)::int,
+           'leads', (count(*) filter (where lead))::int,
+           'ofertas', (count(*) filter (where oferta))::int,
+           'checkouts', (count(*) filter (where checkout))::int,
+           'saiuOferta', (count(*) filter (where oferta and not checkout and fim < now() - interval '${INATIVA}'))::int,
+           'andamento', (count(*) filter (where not oferta and fim >= now() - interval '${INATIVA}'))::int)
+        from ses) as totais,
+       (select count(distinct t.session_id)::int from teste t
+          join quiz_events e on e.quiz_id = $1 and e.session_id = t.session_id
+          where e.created_at >= $2 and e.created_at < $3) as testes`,
+    [quizId, de, ate]
   );
-  return rows.map((r) => ({ screenId: r.screen_id, stepIndex: r.step_index, reached: Number(r.reached) }));
+  const r = rows[0];
+  if (!r) return vazio;
+  return {
+    telas: (r.telas ?? []).map((t) => ({ ...t, tempoMedianoSeg: t.tempoMedianoSeg == null ? null : Number(t.tempoMedianoSeg) })),
+    totais: r.totais,
+    testes: r.testes ?? 0,
+  };
 }
 
 export type HeadlineStat = {

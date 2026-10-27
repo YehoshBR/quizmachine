@@ -31,9 +31,11 @@ export const Route = createFileRoute("/api/track/session")({
             userAgent: typeof b.userAgent === "string" ? b.userAgent.slice(0, MAX_STR) : undefined,
             referrer: typeof b.referrer === "string" ? b.referrer.slice(0, MAX_STR) : undefined,
             utm: b.utm && typeof b.utm === "object" ? (b.utm as Record<string, unknown>) : undefined,
+            isTest: b.isTest === true,
           });
         } catch (err) {
           console.error("[api/track/session] falha:", err);
+          return Response.json({ ok: false }, { status: 500 });
         }
         return Response.json({ ok: true });
       },
