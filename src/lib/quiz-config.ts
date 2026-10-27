@@ -28,6 +28,8 @@ export interface QuizMeta {
   backgroundColor?: string;
   /** true tira a pílula preta atrás do logo (pra logo com fundo transparente feito pra fundo claro). Padrão: pílula preta. */
   logoPlain?: boolean;
+  /** "lg" deixa as opções sem imagem (single e scale) mais altas, com texto e emoji maiores — mais fáceis de tocar. Padrão: normal. */
+  optionSize?: "normal" | "lg";
   /**
    * Dados do PRODUTO — sempre o mesmo produto, independente da resposta.
    * Preenchido uma vez no painel ao montar o quiz. A /oferta usa isso pra
@@ -202,6 +204,8 @@ export type Screen =
       type: "scale";
       question: string;
       statement: string;
+      /** Emoji de cada uma das 5 opções (Concordo totalmente → Discordo totalmente). Opcional. */
+      emojis?: string[];
     }
   | {
       id: string;
@@ -213,6 +217,12 @@ export type Screen =
       images?: string[];
       highlight?: string;
       quote?: Quote;
+      /** true = imagem(ns) no topo, antes do título (estilo matéria). */
+      imageFirst?: boolean;
+      /** Título + texto dentro de um quadro de alerta: "danger" (vermelho) ou "success" (verde). */
+      alert?: "danger" | "success";
+      /** Fonte do dado, num quadro pequeno depois do texto (ex.: logo da universidade + nome da pesquisa). */
+      source?: { text: string; logo?: string };
     }
   | {
       id: string;

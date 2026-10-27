@@ -11,6 +11,7 @@ import { persistAnswers, readPersistedAnswers } from "@/lib/signals";
 import { trackSession, trackHeadlineEvent, trackEvent, getOrCreateSessionId, pixelEvent } from "@/lib/tracking";
 import { ThemedLoader } from "@/components/ThemedLoader";
 import { YoutubeFacade } from "@/components/YoutubeFacade";
+import { cn } from "@/lib/utils";
 
 /** Troca *texto* por <strong> em cor forte (ex.: nomes numa prova social). Seguro (sem dangerouslySetInnerHTML). */
 function emphasize(text: string): ReactNode {
@@ -48,6 +49,16 @@ export const Route = createFileRoute("/")({
 type Answers = Record<string, string | string[]>;
 
 /** Resolve a rota de oferta certa com base nas respostas, quando há LPs segmentadas. */
+/** Opção sem imagem: emoji à esquerda + texto. `large` = versão maior (quizMeta.optionSize "lg"). */
+function EmojiLabel({ emoji, label, large }: { emoji?: string; label: string; large?: boolean }) {
+  return (
+    <div className={large ? "flex min-h-16 items-center gap-4 px-5 py-4" : "flex items-center gap-3 px-5 py-4"}>
+      {emoji && <span className={large ? "text-3xl leading-none" : "text-2xl leading-none"}>{emoji}</span>}
+      <span className={large ? "text-lg font-medium text-foreground" : "text-base font-medium text-foreground"}>{label}</span>
+    </div>
+  );
+}
+
 function resolveOfferPath(quizMeta: QuizMeta, answers: Answers): string {
   let offerPath = quizMeta.offerUrl;
   if (quizMeta.offerRouteByAnswer) {
@@ -292,10 +303,7 @@ function QuizPage() {
                   {opt.image ? (
                     <OptionLabel selected={selected}>{opt.label}</OptionLabel>
                   ) : (
-                    <div className="flex items-center gap-3 px-5 py-4">
-                      {opt.emoji && <span className="text-2xl leading-none">{opt.emoji}</span>}
-                      <span className="text-base font-medium text-foreground">{opt.label}</span>
-                    </div>
+                    <EmojiLabel emoji={opt.emoji} label={opt.label} large={quizMeta.optionSize === "lg"} />
                   )}
                 </OptionCard>
               );
@@ -337,7 +345,11 @@ function QuizPage() {
                   setTimeout(next, 200);
                 }}
               >
-                <OptionLabel selected={selected}>{l}</OptionLabel>
+                {screen.emojis || quizMeta.optionSize === "lg" ? (
+                  <EmojiLabel emoji={screen.emojis?.[i]} label={l} large={quizMeta.optionSize === "lg"} />
+                ) : (
+                  <OptionLabel selected={selected}>{l}</OptionLabel>
+                )}
               </OptionCard>
             );
           })}
@@ -348,23 +360,56 @@ function QuizPage() {
 
   // ─────────── CONTENT ───────────
   if (screen.type === "content") {
+    const contentImages = [screen.image, ...(screen.images ?? [])].filter(Boolean).map((src) => (
+      <div key={src} className="my-3 overflow-hidden rounded-xl border border-border shadow-sm">
+        <img src={src} alt="" className="mx-auto h-auto max-w-full" loading="lazy" onError={onImgError} />
+      </div>
+    ));
     return (
       <QuizLayout progress={progress} onBack={back}>
         <article className="rounded-2xl bg-card p-4 shadow-sm sm:p-6">
+          {screen.imageFirst && contentImages}
           {screen.highlight && (
             <p className="mb-3 rounded-xl bg-primary/5 px-4 py-3 text-sm font-semibold text-primary border border-primary/10">
               {screen.highlight}
             </p>
           )}
-          <h2 className="text-xl font-bold text-foreground sm:text-2xl">{screen.title}</h2>
-          {[screen.image, ...(screen.images ?? [])].filter(Boolean).map((src) => (
-            <div key={src} className="my-3 overflow-hidden rounded-xl border border-border shadow-sm">
-              <img src={src} alt="" className="mx-auto h-auto max-w-full" loading="lazy" onError={onImgError} />
+          <div
+            className={
+              screen.alert === "danger"
+                ? "mt-3 rounded-xl border border-red-200 bg-red-50 p-4"
+                : screen.alert === "success"
+                ? "mt-3 rounded-xl border border-green-200 bg-green-50 p-4"
+                : undefined
+            }
+          >
+            <h2
+              className={cn(
+                "text-xl sm:text-2xl",
+                screen.imageFirst || screen.alert ? "font-extrabold leading-tight" : "font-bold",
+                screen.alert === "danger" ? "text-red-600" : screen.alert === "success" ? "text-green-600" : "text-foreground",
+              )}
+            >
+              {screen.title}
+            </h2>
+            {!screen.imageFirst && contentImages}
+            <p
+              className={cn(
+                "whitespace-pre-line text-base leading-relaxed",
+                screen.alert ? "mt-2 text-foreground" : "mt-4 text-muted-foreground",
+              )}
+            >
+              {emphasize(screen.body)}
+            </p>
+          </div>
+          {screen.source && (
+            <div className="mt-4 flex items-center gap-3 rounded-xl border border-border bg-muted/40 p-3">
+              {screen.source.logo && (
+                <img src={screen.source.logo} alt="" className="h-14 w-auto shrink-0" loading="lazy" onError={onImgError} />
+              )}
+              <p className="text-sm leading-snug text-muted-foreground">{emphasize(screen.source.text)}</p>
             </div>
-          ))}
-          <p className="mt-4 whitespace-pre-line text-base leading-relaxed text-muted-foreground">
-            {emphasize(screen.body)}
-          </p>
+          )}
           {screen.quote && (
             <blockquote className="mt-5 rounded-xl border-l-4 border-secondary bg-muted/50 p-4">
               <p className="text-sm italic text-foreground">"{screen.quote.text}"</p>
