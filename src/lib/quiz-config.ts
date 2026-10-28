@@ -28,6 +28,8 @@ export interface QuizMeta {
   backgroundColor?: string;
   /** true tira a pílula preta atrás do logo (pra logo com fundo transparente feito pra fundo claro). Padrão: pílula preta. */
   logoPlain?: boolean;
+  /** Altura do logo na tela inicial, em px (padrão: 64 com logoPlain, 48 com a pílula). */
+  introLogoHeight?: number;
   /** "lg" deixa as opções sem imagem (single e scale) mais altas, com texto e emoji maiores — mais fáceis de tocar. Padrão: normal. */
   optionSize?: "normal" | "lg";
   /** "heavy" = títulos e perguntas mais grossos e maiores (estilo LP de quiz de tráfego). Padrão: normal. */
