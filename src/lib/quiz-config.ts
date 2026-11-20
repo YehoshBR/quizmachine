@@ -294,6 +294,10 @@ export type Screen =
       bodyBox?: "danger" | "success";
       /** Frase de fechamento em destaque, depois do texto (ex.: "A solução começa na sua mente..."). */
       closing?: string;
+      /** Vídeo próprio (mp4 vertical) depois do título; toca sem som com aviso "toque para ouvir". */
+      videoUrl?: string;
+      /** Capa do vídeo (jpg/webp), mostrada enquanto carrega. */
+      videoPoster?: string;
     }
   | {
       id: string;

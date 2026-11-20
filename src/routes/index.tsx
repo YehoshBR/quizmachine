@@ -11,6 +11,7 @@ import { persistAnswers, readPersistedAnswers } from "@/lib/signals";
 import { trackSession, trackHeadlineEvent, trackEvent, getOrCreateSessionId, pixelEvent } from "@/lib/tracking";
 import { ThemedLoader } from "@/components/ThemedLoader";
 import { YoutubeFacade } from "@/components/YoutubeFacade";
+import { VideoNativo } from "@/components/VideoNativo";
 import { cn } from "@/lib/utils";
 
 /** Troca *texto* por <strong> em cor forte (ex.: nomes numa prova social). Seguro (sem dangerouslySetInnerHTML). */
@@ -394,7 +395,10 @@ function QuizPage() {
               {screen.title}
             </h2>
             {!screen.imageFirst && contentImages}
-            <p
+            {screen.videoUrl && (
+              <VideoNativo src={screen.videoUrl} poster={screen.videoPoster} className="mt-4" />
+            )}
+            {screen.body && <p
               className={cn(
                 "whitespace-pre-line text-base leading-relaxed",
                 screen.alert ? "mt-2 text-foreground" : "mt-4 text-muted-foreground",
@@ -403,7 +407,7 @@ function QuizPage() {
               )}
             >
               {emphasize(screen.body)}
-            </p>
+            </p>}
           </div>
           {screen.closing && (
             <p className="mt-5 text-center text-xl font-extrabold leading-tight text-foreground sm:text-2xl">
