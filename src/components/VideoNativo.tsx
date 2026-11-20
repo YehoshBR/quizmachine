@@ -22,7 +22,7 @@ export function VideoNativo({ src, poster, className = "" }: Props) {
 
   return (
     <div className={`relative mx-auto w-full overflow-hidden rounded-xl bg-black shadow-sm ${className}`}
-         style={{ aspectRatio: "9 / 16", maxHeight: "62svh", maxWidth: "calc(62svh * 9 / 16)" }}>
+         style={{ aspectRatio: "9 / 16", maxHeight: "54svh", maxWidth: "calc(54svh * 9 / 16)" }}>
       <video
         ref={ref}
         src={src}
